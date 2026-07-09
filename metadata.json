@@ -1,0 +1,6 @@
+{
+  "name": "Velora",
+  "description": "Velora is a sleek, beautiful mobile-inspired digital wallet and fintech dashboard featuring instant registration, real-time wallet balance tracking, exchange rates, and interactive action modules.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
