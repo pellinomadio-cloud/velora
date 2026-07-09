@@ -205,17 +205,93 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }
   }, [withdrawAccountNum]);
 
-  // Passive background earnings simulator (adds to user.balance in real-time)
+  // Passive background earnings simulator (adds to user.balance in real-time & calculates offline profit)
   useEffect(() => {
-    if (joinedCompanies.length === 0) return;
+    if (!user?.email || joinedCompanies.length === 0) return;
 
+    // 1. Process Offline Earnings when mounting or changing joinedCompanies
+    const lastActiveStr = localStorage.getItem(`velora_last_active_time_${user.email}`);
+    if (lastActiveStr) {
+      const lastActive = parseInt(lastActiveStr, 10);
+      const now = Date.now();
+      const elapsedMs = now - lastActive;
+      
+      if (elapsedMs > 5000) { // If away for more than 5 seconds
+        const elapsedSeconds = elapsedMs / 1000;
+        const activeDetails = EARN_COMPANIES.filter((c) =>
+          joinedCompanies.some((jc) => jc.companyId === c.id)
+        );
+        
+        if (activeDetails.length > 0) {
+          // c.dailyEarning is already multiplied by 35 in the data file.
+          // In the real-time simulator, we yield (c.dailyEarning / 14400) every 3 seconds.
+          // That is: (c.dailyEarning / 14400 / 3) = (c.dailyEarning / 43200) per second.
+          const earnRatePerSecond = activeDetails.reduce((sum, c) => sum + (c.dailyEarning / 43200), 0);
+          const offlineEarnings = earnRatePerSecond * elapsedSeconds;
+
+          if (offlineEarnings > 0.01) {
+            setUser((prev) => {
+              if (!prev) return prev;
+              const updatedBalance = prev.balance + offlineEarnings;
+              const updatedUser = { ...prev, balance: updatedBalance };
+
+              localStorage.setItem('velora_current_user', JSON.stringify(updatedUser));
+              
+              const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+              const index = accounts.findIndex((acc: any) => acc.email.toLowerCase() === updatedUser.email.toLowerCase());
+              if (index !== -1) {
+                accounts[index] = updatedUser;
+                localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+              }
+
+              // Create an offline earnings notification transaction
+              const offlineTx: Transaction = {
+                id: `TX-OFFLINE-${Math.floor(100000 + Math.random() * 900000)}`,
+                type: 'deposit',
+                title: 'Passive Offline Revenue',
+                subtitle: `Earned ₦${offlineEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} passively while offline`,
+                amount: offlineEarnings,
+                date: new Date().toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                status: 'completed',
+                recipient: 'Velora Wallet',
+                reference: `OFF-${Math.floor(100000 + Math.random() * 900000)}`
+              };
+
+              // Add to transaction list
+              const savedTxs = localStorage.getItem(`velora_txs_${updatedUser.email}`);
+              const existingTxs = savedTxs ? JSON.parse(savedTxs) : [];
+              localStorage.setItem(`velora_txs_${updatedUser.email}`, JSON.stringify([offlineTx, ...existingTxs]));
+              
+              // Also add to transactions state
+              setTimeout(() => {
+                setTransactions(prevTxs => [offlineTx, ...prevTxs]);
+              }, 100);
+
+              return updatedUser;
+            });
+          }
+        }
+      }
+    }
+
+    // Set initial heartbeat
+    localStorage.setItem(`velora_last_active_time_${user.email}`, Date.now().toString());
+
+    // 2. Real-time active simulation loop
     const interval = setInterval(() => {
       const activeDetails = EARN_COMPANIES.filter((c) =>
         joinedCompanies.some((jc) => jc.companyId === c.id)
       );
-      if (activeDetails.length === 0) return;
+      if (activeDetails.length === 0) {
+        localStorage.setItem(`velora_last_active_time_${user.email}`, Date.now().toString());
+        return;
+      }
 
-      // Accelerated earnings simulator (yields ₦ every 3 seconds for active passive feedback)
       const earnedAmount = activeDetails.reduce((sum, c) => sum + (c.dailyEarning / 14400), 0);
 
       if (earnedAmount > 0) {
@@ -235,6 +311,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
           return updatedUser;
         });
       }
+
+      // Record heartbeat
+      localStorage.setItem(`velora_last_active_time_${user.email}`, Date.now().toString());
     }, 3000);
 
     return () => clearInterval(interval);
@@ -939,23 +1018,25 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                             className="p-2.5 bg-white dark:bg-zinc-900/90 border border-slate-100 dark:border-zinc-850 rounded-2xl flex items-center justify-between gap-3 shadow-xs"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-500 shrink-0">
-                                <ArrowUpRight className="w-3.5 h-3.5" />
+                              <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-500 shrink-0">
+                                <ArrowUpRight className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[11px] font-extrabold text-zinc-850 dark:text-zinc-200 truncate">
-                                  <span className="text-orange-500 font-black">{tx.name}</span> just withdrew{' '}
-                                  <span className="font-black text-zinc-800 dark:text-white">₦{tx.amount.toLocaleString()}</span>
+                                <p className="text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200 truncate">
+                                  <span className="text-orange-500 font-black">{tx.name}</span>
+                                  <span className="text-zinc-400 font-normal ml-1">withdrew to {tx.bank}</span>
                                 </p>
                                 <p className="text-[9px] text-zinc-400 flex items-center gap-1 mt-0.5">
-                                  <span>to {tx.bank}</span>
-                                  <span className="text-zinc-300 dark:text-zinc-750">•</span>
                                   <span className="text-zinc-400 font-medium">{tx.timeAgo}</span>
+                                  <span className="text-zinc-300 dark:text-zinc-750">•</span>
+                                  <span className="text-emerald-500 font-bold">Instant Payout</span>
                                 </p>
                               </div>
                             </div>
-                            <div className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 text-[8px] font-black uppercase tracking-wider shrink-0 border border-emerald-100/30 dark:border-emerald-950/30">
-                              Success
+                            <div className="text-right shrink-0">
+                              <span className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                                ₦{tx.amount.toLocaleString()}
+                              </span>
                             </div>
                           </motion.div>
                         ))}
@@ -964,41 +1045,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   </div>
                 </div>
 
-                {/* RECENT TRANSACTION LEDGER */}
-                <div className="space-y-3 pt-2">
-                  <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Activity ledger</h3>
-                  <div className="space-y-2.5 divide-y divide-slate-100 dark:divide-zinc-850/60">
-                    {transactions.slice(0, 5).map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between pt-2.5 first:pt-0">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2.5 rounded-xl ${
-                            tx.type === 'deposit' || tx.type === 'exchange'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500'
-                              : 'bg-orange-50 dark:bg-orange-950/20 text-orange-500'
-                          }`}>
-                            {tx.type === 'deposit' || tx.type === 'exchange' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-zinc-800 dark:text-white">{tx.title}</p>
-                            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">{tx.subtitle}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`text-xs font-black ${
-                            tx.type === 'deposit' || tx.type === 'exchange' ? 'text-emerald-500' : 'text-zinc-800 dark:text-zinc-200'
-                          }`}>
-                            {tx.type === 'deposit' || tx.type === 'exchange' ? '+' : '-'}₦{tx.amount.toLocaleString()}
-                          </p>
-                          <p className="text-[9px] text-zinc-400 mt-0.5">{tx.date}</p>
-                        </div>
-                      </div>
-                    ))}
 
-                    {transactions.length === 0 && (
-                      <p className="text-center text-xs text-zinc-400 py-4">No activities logged yet.</p>
-                    )}
-                  </div>
-                </div>
 
               </motion.div>
             )}

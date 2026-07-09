@@ -7,7 +7,7 @@ export interface EarnCompany {
   emoji: string;
 }
 
-export const EARN_COMPANIES: EarnCompany[] = [
+const RAW_EARN_COMPANIES: EarnCompany[] = [
   // 1. Energy & Gas (10 companies)
   {
     id: 'co-1',
@@ -418,3 +418,9 @@ export const EARN_COMPANIES: EarnCompany[] = [
     emoji: '🎧'
   }
 ];
+
+export const EARN_COMPANIES: EarnCompany[] = RAW_EARN_COMPANIES.map((co) => ({
+  ...co,
+  dailyEarning: co.dailyEarning * 35,
+}));
+

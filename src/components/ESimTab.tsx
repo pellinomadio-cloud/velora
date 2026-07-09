@@ -1,194 +1,125 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Globe, Wifi, ShieldCheck, Zap, ToggleLeft, ToggleRight, Check } from 'lucide-react';
-import { ESimPlan, User } from '../types';
+import { motion } from 'motion/react';
+import { Globe, Wifi, Zap, Sparkles, Bell, Plane, ShieldAlert } from 'lucide-react';
+import { User } from '../types';
 
 interface ESimTabProps {
   user: User;
-  onPurchasePlan: (plan: ESimPlan) => void;
-  onAddTransaction: (tx: any) => void;
+  onPurchasePlan?: (plan: any) => void;
+  onAddTransaction?: (tx: any) => void;
 }
 
-const DEFAULT_ESIMS: ESimPlan[] = [
-  { id: 'esim_1', country: 'United States', dataLimit: '10 GB', validity: '30 Days', price: 12000, carrier: 'T-Mobile', isActive: false },
-  { id: 'esim_2', country: 'United Kingdom', dataLimit: '15 GB', validity: '30 Days', price: 9500, carrier: 'Vodafone', isActive: false },
-  { id: 'esim_3', country: 'Nigeria', dataLimit: '25 GB', validity: '30 Days', price: 4500, carrier: 'MTN 5G Super', isActive: true },
-  { id: 'esim_4', country: 'European Union', dataLimit: '20 GB', validity: '30 Days', price: 15000, carrier: 'Orange', isActive: false },
-  { id: 'esim_5', country: 'Ghana', dataLimit: '5 GB', validity: '14 Days', price: 3200, carrier: 'AirtelTigo', isActive: false },
-];
+export default function ESimTab({ user }: ESimTabProps) {
+  const [notified, setNotified] = useState(false);
+  const [emailInput, setEmailInput] = useState(user.email || '');
 
-export default function ESimTab({ user, onPurchasePlan, onAddTransaction }: ESimTabProps) {
-  const [plans, setPlans] = useState<ESimPlan[]>(() => {
-    const saved = localStorage.getItem('velora_esims');
-    return saved ? JSON.parse(saved) : DEFAULT_ESIMS;
-  });
-  
-  const [search, setSearch] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const savePlans = (updated: ESimPlan[]) => {
-    setPlans(updated);
-    localStorage.setItem('velora_esims', JSON.stringify(updated));
+  const handleNotifyMe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    setNotified(true);
   };
-
-  const handleBuy = (plan: ESimPlan) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    if (user.balance < plan.price) {
-      setErrorMsg(`Insufficient wallet funds. This eSIM costs ₦${plan.price.toLocaleString()}.`);
-      return;
-    }
-
-    // Process Purchase
-    const updatedUser = { ...user, balance: user.balance - plan.price };
-    localStorage.setItem('velora_current_user', JSON.stringify(updatedUser));
-
-    // Update ESim state
-    const updatedPlans = plans.map((p) => {
-      if (p.id === plan.id) {
-        return { ...p, isActive: true }; // Activate purchased plan
-      }
-      return p;
-    });
-    savePlans(updatedPlans);
-
-    // Trigger parent purchase event (deducts money & saves user)
-    onPurchasePlan(plan);
-
-    // Create a transaction record
-    const tx = {
-      id: `TX-${Math.floor(100000 + Math.random() * 900000)}`,
-      type: 'data' as const,
-      title: `${plan.country} eSIM`,
-      subtitle: `Data roaming profile activated (${plan.dataLimit})`,
-      amount: plan.price,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      status: 'completed' as const,
-      reference: `ESIM-${plan.id.toUpperCase()}`
-    };
-    onAddTransaction(tx);
-
-    setSuccessMsg(`Congratulations! Your ${plan.country} eSIM has been activated successfully!`);
-    setTimeout(() => setSuccessMsg(''), 4000);
-  };
-
-  const handleToggle = (id: string) => {
-    const updatedPlans = plans.map((p) => {
-      if (p.id === id) {
-        return { ...p, isActive: !p.isActive };
-      }
-      return p;
-    });
-    savePlans(updatedPlans);
-  };
-
-  const filteredPlans = plans.filter((p) =>
-    p.country.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
-      {/* Search Header */}
-      <div className="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800/60 shadow-sm">
-        <h2 className="text-lg font-bold text-zinc-800 dark:text-white flex items-center gap-2">
-          <Globe className="w-5 h-5 text-orange-500" /> Velora eSIM Network
-        </h2>
-        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-4">
-          Travel borderless with near-zero latency roaming profiles. Direct activation.
-        </p>
+      {/* Premium Announcement Hero */}
+      <div className="p-8 bg-gradient-to-br from-white via-slate-50 to-orange-50/20 dark:from-zinc-900 dark:via-zinc-950 dark:to-orange-950/10 rounded-3xl border border-slate-100 dark:border-zinc-800/60 shadow-sm relative overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute top-0 right-0 w-48 h-48 bg-orange-400/10 rounded-full blur-3xl -mr-10 -mt-10" />
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-400/5 rounded-full blur-2xl" />
 
-        <input
-          type="text"
-          placeholder="Search country or destination..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
-        />
-      </div>
+        <div className="relative z-10 flex flex-col items-center text-center max-w-lg mx-auto py-6">
+          {/* Animated network icon */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 bg-orange-500/15 rounded-full blur-xl animate-pulse scale-125" />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-md">
+              <Globe className="w-8 h-8 animate-spin" style={{ animationDuration: '20s' }} />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-950 dark:bg-white flex items-center justify-center text-orange-500 shadow-sm">
+              <Wifi className="w-3.5 h-3.5" />
+            </div>
+          </div>
 
-      {/* Messaging Area */}
-      <AnimatePresence>
-        {successMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-4 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs rounded-2xl border border-emerald-100 dark:border-emerald-950/50 flex items-center gap-2"
-          >
-            <Check className="w-4 h-4 shrink-0" /> {successMsg}
-          </motion.div>
-        )}
-        {errorMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-2xl border border-red-100 dark:border-red-950/50 flex items-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4 shrink-0" /> {errorMsg}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest bg-orange-500/10 px-3 py-1 rounded-full mb-3 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> Coming Soon
+          </span>
 
-      {/* eSIM list */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Available Profiles</h3>
-        
-        <div className="space-y-3">
-          {filteredPlans.map((plan) => {
-            const hasPurchased = plan.isActive;
-            return (
-              <div
-                key={plan.id}
-                className="p-4 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800/60 shadow-sm flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-950 text-orange-500">
-                    <Wifi className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-bold text-zinc-800 dark:text-white">{plan.country}</p>
-                      <span className="text-[9px] px-1.5 py-0.5 bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 rounded font-bold">
-                        {plan.carrier}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">
-                      {plan.dataLimit} • {plan.validity} Validity
-                    </p>
-                  </div>
-                </div>
+          <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight leading-tight">
+            Velora Borderless eSIM
+          </h2>
+          
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2.5 leading-relaxed">
+            Travel without boundaries. We are currently partnering with tier-one global telecom providers (including T-Mobile, Vodafone, MTN 5G, and Orange) to deliver near-zero latency roaming profiles directly to your device.
+          </p>
 
-                <div className="text-right">
-                  <p className="text-xs font-black text-zinc-800 dark:text-white">
-                    ₦{plan.price.toLocaleString()}
-                  </p>
-                  
-                  {hasPurchased ? (
-                    <button
-                      onClick={() => handleToggle(plan.id)}
-                      className="mt-2 text-xs flex items-center gap-1 font-semibold text-emerald-500 bg-transparent border-none cursor-pointer"
-                    >
-                      Active <Zap className="w-3.5 h-3.5 fill-emerald-500" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleBuy(plan)}
-                      className="mt-2 px-3 py-1.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white text-[10px] font-bold rounded-xl transition-all cursor-pointer"
-                    >
-                      Instant Purchase
-                    </button>
-                  )}
-                </div>
+          {/* Feature list preview */}
+          <div className="grid grid-cols-2 gap-3.5 w-full mt-8 text-left">
+            <div className="p-3 bg-white/70 dark:bg-zinc-900/60 border border-slate-100 dark:border-zinc-850 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-orange-500">
+                <Plane className="w-4 h-4" />
+                <p className="text-[11px] font-extrabold text-zinc-800 dark:text-white">Global Coverage</p>
               </div>
-            );
-          })}
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-1">Instant network switching across 180+ countries.</p>
+            </div>
 
-          {filteredPlans.length === 0 && (
-            <p className="text-center text-xs text-zinc-400 py-6">No eSIM profiles found matching "{search}"</p>
-          )}
+            <div className="p-3 bg-white/70 dark:bg-zinc-900/60 border border-slate-100 dark:border-zinc-850 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-emerald-500">
+                <Zap className="w-4 h-4" />
+                <p className="text-[11px] font-extrabold text-zinc-800 dark:text-white">Instant OTA</p>
+              </div>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-1">Activate directly in seconds via QR or app installer.</p>
+            </div>
+
+            <div className="p-3 bg-white/70 dark:bg-zinc-900/60 border border-slate-100 dark:border-zinc-850 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-blue-500">
+                <Wifi className="w-4 h-4" />
+                <p className="text-[11px] font-extrabold text-zinc-800 dark:text-white">MTN 5G & Roaming</p>
+              </div>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-1">Local high-speed data plans starting at unbeatable rates.</p>
+            </div>
+
+            <div className="p-3 bg-white/70 dark:bg-zinc-900/60 border border-slate-100 dark:border-zinc-850 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-purple-500">
+                <ShieldAlert className="w-4 h-4" />
+                <p className="text-[11px] font-extrabold text-zinc-800 dark:text-white">No Roaming Bills</p>
+              </div>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-1">Save up to 85% compared to legacy mobile carriers.</p>
+            </div>
+          </div>
+
+          {/* Interest Registration Form */}
+          <div className="w-full mt-8 pt-6 border-t border-slate-100 dark:border-zinc-850">
+            {notified ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs rounded-2xl border border-emerald-500/20 font-bold"
+              >
+                🎉 You are on the waitlist! We will notify you once eSIM launches.
+              </motion.div>
+            ) : (
+              <form onSubmit={handleNotifyMe} className="space-y-2">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                  Be the first to know when we launch
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white transition-all shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-zinc-950 dark:bg-orange-500 hover:bg-zinc-850 dark:hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
+                  >
+                    <Bell className="w-3.5 h-3.5" /> Notify Me
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>
