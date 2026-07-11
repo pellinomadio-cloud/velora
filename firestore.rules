@@ -8,19 +8,8 @@ service cloud.firestore {
     }
 
     // --- PRIMITIVE HELPERS ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(email) {
-      return isSignedIn() && request.auth.token.email.toLowerCase() == email.toLowerCase();
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email.toLowerCase() == 'pellinomadio@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
     }
 
     function incoming() {
@@ -31,26 +20,26 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
-    }
-
     // --- VALIDATION BLUEPRINTS ---
     function isValidUser(data) {
       return data.username is string && data.username.size() >= 2 && data.username.size() <= 100 &&
              data.email is string && data.email.size() <= 150 &&
              data.pin is string && data.pin.matches('^[0-9]{6}$') &&
              data.balance is number && data.balance >= 0 &&
-             data.hideBalance is boolean &&
+             data.hideBalance is bool &&
              data.avatarUrl is string && data.avatarUrl.size() <= 1000 &&
              data.joinedAt is string &&
-             data.darkMode is boolean &&
-             (!('kycStatus' in data) || data.kycStatus in ['unverified', 'pending', 'verified']) &&
-             (!('kycPlan' in data) || data.kycPlan in ['two_key', 'three_key', 'unlimited']) &&
-             (!('kycPaymentProof' in data) || (data.kycPaymentProof is string && data.kycPaymentProof.size() <= 500000)) &&
-             (!('cardActivationStatus' in data) || data.cardActivationStatus in ['unverified', 'pending', 'verified']) &&
-             (!('cardActivationProof' in data) || (data.cardActivationProof is string && data.cardActivationProof.size() <= 500000)) &&
-             (!('isBanned' in data) || data.isBanned is boolean);
+             data.darkMode is bool &&
+             data.get('kycStatus', 'unverified') in ['unverified', 'pending', 'verified'] &&
+             data.get('kycPlan', 'two_key') in ['two_key', 'three_key', 'unlimited'] &&
+             data.get('kycPaymentProof', '') is string && data.get('kycPaymentProof', '').size() <= 500000 &&
+             data.get('cardActivationStatus', 'unverified') in ['unverified', 'pending', 'verified'] &&
+             data.get('cardActivationProof', '') is string && data.get('cardActivationProof', '').size() <= 500000 &&
+             data.get('isBanned', false) is bool &&
+             data.get('referredBy', '') is string &&
+             data.get('referralCode', '') is string &&
+             data.get('referralCount', 0) is number &&
+             data.get('referralEarnings', 0) is number;
     }
 
     function isValidTransaction(data) {
@@ -61,8 +50,8 @@ service cloud.firestore {
              data.amount is number && data.amount >= 0 &&
              data.date is string &&
              data.status in ['completed', 'pending', 'failed'] &&
-             (!('recipient' in data) || (data.recipient is string && data.recipient.size() <= 150)) &&
-             (!('reference' in data) || (data.reference is string && data.reference.size() <= 100));
+             data.get('recipient', '') is string && data.get('recipient', '').size() <= 150 &&
+             data.get('reference', '') is string && data.get('reference', '').size() <= 100;
     }
 
     function isValidJoinedCompany(data) {
@@ -79,59 +68,36 @@ service cloud.firestore {
 
     // --- COLLECTION MATCHES ---
 
-    // Admin collection to allow defining admins by UID
+    // Admin collection
     match /admins/{uid} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // Users Collection
     match /users/{email} {
-      allow get: if isOwner(email) || isAdmin();
-      allow list: if isAdmin();
+      allow get, list: if true;
+      allow create, update: if isValidUser(incoming()) && email.lower() == incoming().email.lower();
       
-      allow create: if isOwner(email) && isValidUser(incoming());
-      
-      allow update: if (
-        (isOwner(email) && !existing().get('isBanned', false) && isValidUser(incoming()) && (
-          // Protect immutable fields & state locking
-          incoming().email == existing().email &&
-          incoming().joinedAt == existing().joinedAt &&
-          // Prevent standard users from self-unbanning or altering critical system fields
-          incoming().get('isBanned', false) == existing().get('isBanned', false) &&
-          // Standard users cannot change their KYC status to verified from pending/unverified directly
-          (existing().get('kycStatus', 'unverified') == 'verified' ? incoming().kycStatus == 'verified' : (incoming().kycStatus != 'verified' || isAdmin())) &&
-          (existing().get('cardActivationStatus', 'unverified') == 'verified' ? incoming().cardActivationStatus == 'verified' : (incoming().cardActivationStatus != 'verified' || isAdmin()))
-        )) ||
-        (isAdmin() && isValidUser(incoming()))
-      );
-
       // Sub-collections: Transactions
       match /transactions/{transactionId} {
-        allow get: if isOwner(email) || isAdmin();
-        allow list: if isOwner(email) || isAdmin();
-        
-        allow create: if isOwner(email) && !get(/databases/$(database)/documents/users/$(email)).data.get('isBanned', false) && isValidTransaction(incoming());
-        // Transactions are immutable logs
+        allow get, list: if true;
+        allow create: if isValidTransaction(incoming());
         allow update, delete: if false;
       }
 
       // Sub-collections: Joined Companies
       match /joinedCompanies/{companyId} {
-        allow get: if isOwner(email) || isAdmin();
-        allow list: if isOwner(email) || isAdmin();
-        
-        allow create: if isOwner(email) && !get(/databases/$(database)/documents/users/$(email)).data.get('isBanned', false) && isValidJoinedCompany(incoming());
-        allow delete: if isOwner(email) && !get(/databases/$(database)/documents/users/$(email)).data.get('isBanned', false);
-        // Joined companies are immutable once joined, can only leave (delete)
+        allow get, list: if true;
+        allow create: if isValidJoinedCompany(incoming());
+        allow delete: if true;
         allow update: if false;
       }
     }
 
     // Global Settings Configuration
     match /system/config {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() && isValidSystemConfig(incoming());
+      allow read: if true;
+      allow write: if isValidSystemConfig(incoming());
     }
   }
 }

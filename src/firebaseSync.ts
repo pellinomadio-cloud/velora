@@ -22,7 +22,11 @@ export async function syncUserToFirebase(user: User): Promise<void> {
       kycPaymentProof: user.kycPaymentProof || '',
       cardActivationStatus: user.cardActivationStatus || 'unverified',
       cardActivationProof: user.cardActivationProof || '',
-      isBanned: user.isBanned || false
+      isBanned: user.isBanned || false,
+      referredBy: user.referredBy || '',
+      referralCode: user.referralCode || '',
+      referralCount: user.referralCount || 0,
+      referralEarnings: user.referralEarnings || 0
     }, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -101,7 +105,11 @@ export async function getAllUsersFromFirebase(): Promise<User[]> {
         kycPaymentProof: data.kycPaymentProof,
         cardActivationStatus: data.cardActivationStatus,
         cardActivationProof: data.cardActivationProof,
-        isBanned: data.isBanned || false
+        isBanned: data.isBanned || false,
+        referredBy: data.referredBy || '',
+        referralCode: data.referralCode || '',
+        referralCount: data.referralCount || 0,
+        referralEarnings: data.referralEarnings || 0
       });
     });
     return users;

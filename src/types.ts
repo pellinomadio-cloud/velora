@@ -13,6 +13,10 @@ export interface User {
   cardActivationStatus?: 'unverified' | 'pending' | 'verified';
   cardActivationProof?: string;
   isBanned?: boolean;
+  referredBy?: string;
+  referralCode?: string;
+  referralCount?: number;
+  referralEarnings?: number;
 }
 
 export interface Transaction {

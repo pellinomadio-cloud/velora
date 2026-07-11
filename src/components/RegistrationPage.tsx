@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mail, User as UserIcon, Lock, CheckCircle2, ArrowRight, ArrowLeft, KeyRound } from 'lucide-react';
-import { User } from '../types';
-import { syncUserToFirebase } from '../firebaseSync';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { Mail, User as UserIcon, Lock, CheckCircle2, ArrowRight, Gift, KeyRound } from 'lucide-react';
+import { User, Transaction } from '../types';
+import { 
+  syncUserToFirebase, 
+  getAllUsersFromFirebase, 
+  syncTransactionToFirebase 
+} from '../firebaseSync';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { db, auth } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface RegistrationPageProps {
   onRegisterComplete: (user: User) => void;
@@ -19,343 +26,732 @@ const AVATAR_PRESETS = [
 ];
 
 export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin }: RegistrationPageProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Profile Info, 2: Choose Avatar, 3: Set 6-Digit PIN
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [avatarId, setAvatarId] = useState('avatar_1');
   const [pin, setPin] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Handle Form Submission for Step 1
-  const handleStep1Submit = (e: React.FormEvent) => {
+  // Google Sign-In pending registration states
+  const [googlePendingUser, setGooglePendingUser] = useState<{ email: string; displayName?: string } | null>(null);
+  const [pendingUsername, setPendingUsername] = useState('');
+  const [pendingPin, setPendingPin] = useState('');
+  const [pendingReferralCode, setPendingReferralCode] = useState('');
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const userObj = result.user;
+      if (userObj && userObj.email) {
+        const userEmail = userObj.email.toLowerCase().trim();
+        
+        // Try to fetch user document from Firestore
+        const userRef = doc(db, 'users', userEmail);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const firebaseUser = snap.data() as User;
+          
+          // Check if banned
+          if (firebaseUser.isBanned) {
+            setError('This account has been suspended by central compliance.');
+            setIsLoading(false);
+            onRegisterComplete(firebaseUser); // This will render the suspension page
+            return;
+          }
+
+          // Success! Save to local storage & login
+          const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+          const idx = accounts.findIndex((a: User) => a.email.toLowerCase() === userEmail);
+          if (idx !== -1) {
+            accounts[idx] = firebaseUser;
+          } else {
+            accounts.push(firebaseUser);
+          }
+          localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+          localStorage.setItem('velora_current_user', JSON.stringify(firebaseUser));
+          onRegisterComplete(firebaseUser);
+        } else {
+          // Doesn't exist, we transition to complete profile step
+          const cleanName = (userObj.displayName || '').toLowerCase().replace(/\s+/g, '');
+          setPendingUsername(cleanName);
+          setGooglePendingUser({
+            email: userEmail,
+            displayName: userObj.displayName || '',
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('Google Sign-In failed:', err);
+      setError(err.message || 'Google Sign-In failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!googlePendingUser) return;
     setError('');
+    setIsLoading(true);
 
-    if (!username.trim()) {
+    const cleanUsername = pendingUsername.toLowerCase().trim().replace(/\s+/g, '');
+    const cleanEmail = googlePendingUser.email.toLowerCase().trim();
+    const cleanReferral = pendingReferralCode.trim().toLowerCase();
+
+    // Validations
+    if (!cleanUsername) {
       setError('Username is required');
+      setIsLoading(false);
       return;
     }
-    if (username.length < 3) {
+    if (cleanUsername.length < 3) {
       setError('Username must be at least 3 characters');
+      setIsLoading(false);
       return;
     }
-    if (!email.trim()) {
-      setError('Email is required');
-      return;
-    }
-    // Simple email regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
+    if (pendingPin.length !== 6 || !/^\d{6}$/.test(pendingPin)) {
+      setError('PIN must be exactly 6 numeric digits');
+      setIsLoading(false);
       return;
     }
 
-    setStep(2);
-  };
+    try {
+      const allUsers = await getAllUsersFromFirebase();
+      
+      // Verify username uniqueness
+      const usernameExists = allUsers.some(u => u.username.toLowerCase() === cleanUsername);
+      if (usernameExists) {
+        setError('This username is already taken. Please choose another.');
+        setIsLoading(false);
+        return;
+      }
 
-  // Handle Step 2 Submit
-  const handleStep2Submit = () => {
-    setStep(3);
-  };
+      // Check referral code validity if entered
+      let referrerUser: User | null = null;
+      if (cleanReferral) {
+        referrerUser = allUsers.find(u => u.username.toLowerCase() === cleanReferral) || null;
+        if (!referrerUser) {
+          setError('Referral code not found. Please check or leave blank.');
+          setIsLoading(false);
+          return;
+        }
+        if (referrerUser.email.toLowerCase() === cleanEmail || referrerUser.username.toLowerCase() === cleanUsername) {
+          setError('You cannot refer yourself.');
+          setIsLoading(false);
+          return;
+        }
+      }
 
-  // Append digit to 6-digit password
-  const handleDigitPress = (digit: string) => {
-    setError('');
-    if (pin.length < 6) {
-      setPin((prev) => prev + digit);
+      // Initialize base parameters
+      let initialBalance = 0.00;
+      let newUserReferredBy = '';
+
+      if (referrerUser) {
+        initialBalance = 2000.00; // ₦2,000 welcome bonus
+        newUserReferredBy = referrerUser.username;
+      }
+
+      const newUser: User = {
+        username: cleanUsername,
+        email: cleanEmail,
+        pin: pendingPin,
+        balance: initialBalance,
+        hideBalance: false,
+        avatarUrl: '🧑🏾‍💻', // Default visual avatar emoji
+        joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        darkMode: false,
+        referredBy: newUserReferredBy,
+        referralCode: cleanUsername,
+        referralCount: 0,
+        referralEarnings: 0,
+        kycStatus: 'unverified',
+        cardActivationStatus: 'unverified'
+      };
+
+      // Save user to Firestore
+      await syncUserToFirebase(newUser);
+
+      // Reward referrer if exists
+      if (referrerUser) {
+        const referrerUpdated: User = {
+          ...referrerUser,
+          balance: (referrerUser.balance || 0) + 3000.00,
+          referralCount: (referrerUser.referralCount || 0) + 1,
+          referralEarnings: (referrerUser.referralEarnings || 0) + 3000.00
+        };
+
+        await syncUserToFirebase(referrerUpdated);
+
+        const referrerTx: Transaction = {
+          id: `TX-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+          type: 'deposit',
+          title: 'Referral Commission',
+          subtitle: `Earned ₦3,000 for inviting @${cleanUsername}`,
+          amount: 3000,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          status: 'completed',
+          reference: `REF-${Math.floor(100000 + Math.random() * 900000)}`
+        };
+
+        await syncTransactionToFirebase(referrerUser.email, referrerTx);
+
+        // Save referrer transaction locally
+        const refSavedTxs = JSON.parse(localStorage.getItem(`velora_txs_${referrerUser.email}`) || '[]');
+        refSavedTxs.unshift(referrerTx);
+        localStorage.setItem(`velora_txs_${referrerUser.email}`, JSON.stringify(refSavedTxs));
+
+        // Create new user welcome transaction log
+        const welcomeTx: Transaction = {
+          id: `TX-WEL-${Math.floor(100000 + Math.random() * 900000)}`,
+          type: 'deposit',
+          title: 'Referral Welcome Bonus',
+          subtitle: `Welcome! Invited by @${referrerUser.username}`,
+          amount: 2000,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          status: 'completed',
+          reference: `REF-${Math.floor(100000 + Math.random() * 900000)}`
+        };
+
+        await syncTransactionToFirebase(cleanEmail, welcomeTx);
+
+        // Save new user transaction locally
+        localStorage.setItem(`velora_txs_${cleanEmail}`, JSON.stringify([welcomeTx]));
+
+        // Update local accounts list
+        const accountsList = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+        const updatedAccountsList = accountsList.map((acc: any) => {
+          if (acc.email.toLowerCase() === referrerUser!.email.toLowerCase()) {
+            return referrerUpdated;
+          }
+          return acc;
+        });
+        updatedAccountsList.push(newUser);
+        localStorage.setItem('velora_accounts', JSON.stringify(updatedAccountsList));
+      } else {
+        const accountsList = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+        accountsList.push(newUser);
+        localStorage.setItem('velora_accounts', JSON.stringify(accountsList));
+      }
+
+      // Save as currently logged in user
+      localStorage.setItem('velora_current_user', JSON.stringify(newUser));
+      onRegisterComplete(newUser);
+    } catch (err) {
+      console.error('Failed to complete Google registration:', err);
+      setError('Failed to complete setup. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  // Backspace PIN
-  const handleBackspace = () => {
-    setPin((prev) => prev.slice(0, -1));
   };
 
   // Complete Registration
-  const handleRegister = () => {
-    if (pin.length !== 6) {
-      setError('Please enter a full 6-digit numeric PIN');
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    const cleanUsername = username.toLowerCase().trim().replace(/\s+/g, '');
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanReferral = referralCode.trim().toLowerCase();
+
+    // Validations
+    if (!cleanUsername) {
+      setError('Username is required');
+      setIsLoading(false);
+      return;
+    }
+    if (cleanUsername.length < 3) {
+      setError('Username must be at least 3 characters');
+      setIsLoading(false);
+      return;
+    }
+    if (!cleanEmail) {
+      setError('Email is required');
+      setIsLoading(false);
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address');
+      setIsLoading(false);
+      return;
+    }
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setError('PIN must be exactly 6 numeric digits');
+      setIsLoading(false);
       return;
     }
 
-    const newUser: User = {
-      username: username.toLowerCase().trim(),
-      email: email.trim(),
-      pin,
-      balance: 0.00, // Pre-fund registration with ₦0.00 naira for real onboarding!
-      hideBalance: false,
-      avatarUrl: AVATAR_PRESETS.find((a) => a.id === avatarId)?.emoji || '🧑🏾‍💻',
-      joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      darkMode: false,
-    };
+    try {
+      // 1. Fetch all existing users to validate uniqueness and process referral
+      const allUsers = await getAllUsersFromFirebase();
+      
+      // Verify username/email uniqueness
+      const emailExists = allUsers.some(u => u.email.toLowerCase() === cleanEmail);
+      if (emailExists) {
+        setError('An account with this email already exists.');
+        setIsLoading(false);
+        return;
+      }
+      const usernameExists = allUsers.some(u => u.username.toLowerCase() === cleanUsername);
+      if (usernameExists) {
+        setError('This username is already taken. Please choose another.');
+        setIsLoading(false);
+        return;
+      }
 
-    // Save user to localStorage
-    const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
-    // Check if account already exists
-    const exists = accounts.some((acc: any) => acc.email.toLowerCase() === email.toLowerCase());
-    if (exists) {
-      setError('An account with this email already exists.');
-      setStep(1); // Go back to start
-      return;
+      // Check referral code validity if entered
+      let referrerUser: User | null = null;
+      if (cleanReferral) {
+        // Referral code is the referrer's username
+        referrerUser = allUsers.find(u => u.username.toLowerCase() === cleanReferral) || null;
+        if (!referrerUser) {
+          setError('Referral code not found. Please check or leave blank.');
+          setIsLoading(false);
+          return;
+        }
+        if (referrerUser.email.toLowerCase() === cleanEmail || referrerUser.username.toLowerCase() === cleanUsername) {
+          setError('You cannot refer yourself.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Initialize base parameters
+      let initialBalance = 0.00;
+      let newUserReferredBy = '';
+
+      // If referred, set welcome bonus
+      if (referrerUser) {
+        initialBalance = 2000.00; // ₦2,000 Sign-up Welcome Bonus
+        newUserReferredBy = referrerUser.username;
+      }
+
+      const newUser: User = {
+        username: cleanUsername,
+        email: cleanEmail,
+        pin,
+        balance: initialBalance,
+        hideBalance: false,
+        avatarUrl: AVATAR_PRESETS.find((a) => a.id === avatarId)?.emoji || '🧑🏾‍💻',
+        joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        darkMode: false,
+        referredBy: newUserReferredBy,
+        referralCode: cleanUsername, // Their username serves as their referral code
+        referralCount: 0,
+        referralEarnings: 0,
+        kycStatus: 'unverified',
+        cardActivationStatus: 'unverified'
+      };
+
+      // 2. Save new user to Firebase
+      await syncUserToFirebase(newUser);
+
+      // If there was a referrer, reward them and update their profile
+      if (referrerUser) {
+        const referrerUpdated: User = {
+          ...referrerUser,
+          balance: (referrerUser.balance || 0) + 3000.00, // ₦3,000 commission
+          referralCount: (referrerUser.referralCount || 0) + 1,
+          referralEarnings: (referrerUser.referralEarnings || 0) + 3000.00
+        };
+
+        // Sync referrer update to Firebase
+        await syncUserToFirebase(referrerUpdated);
+
+        // Generate Referrer's transaction log
+        const referrerTx: Transaction = {
+          id: `TX-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+          type: 'deposit',
+          title: 'Referral Commission',
+          subtitle: `Earned ₦3,000 for inviting @${cleanUsername}`,
+          amount: 3000,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          status: 'completed',
+          reference: `REF-${Math.floor(100000 + Math.random() * 900000)}`
+        };
+
+        await syncTransactionToFirebase(referrerUser.email, referrerTx);
+
+        // Also save referrer's transaction locally if they are on this machine
+        const refSavedTxs = JSON.parse(localStorage.getItem(`velora_txs_${referrerUser.email}`) || '[]');
+        refSavedTxs.unshift(referrerTx);
+        localStorage.setItem(`velora_txs_${referrerUser.email}`, JSON.stringify(refSavedTxs));
+
+        // Generate New User's welcome transaction log
+        const welcomeTx: Transaction = {
+          id: `TX-WEL-${Math.floor(100000 + Math.random() * 900000)}`,
+          type: 'deposit',
+          title: 'Referral Welcome Bonus',
+          subtitle: `Welcome! Invited by @${referrerUser.username}`,
+          amount: 2000,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          status: 'completed',
+          reference: `REF-${Math.floor(100000 + Math.random() * 900000)}`
+        };
+
+        await syncTransactionToFirebase(cleanEmail, welcomeTx);
+
+        // Save new user's transaction locally
+        const newUserTxs = [welcomeTx];
+        localStorage.setItem(`velora_txs_${cleanEmail}`, JSON.stringify(newUserTxs));
+
+        // Update referrer locally in the accounts list
+        const accountsList = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+        const updatedAccountsList = accountsList.map((acc: any) => {
+          if (acc.email.toLowerCase() === referrerUser!.email.toLowerCase()) {
+            return referrerUpdated;
+          }
+          return acc;
+        });
+        updatedAccountsList.push(newUser);
+        localStorage.setItem('velora_accounts', JSON.stringify(updatedAccountsList));
+      } else {
+        // No referrer, just add new user to local accounts
+        const accountsList = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+        accountsList.push(newUser);
+        localStorage.setItem('velora_accounts', JSON.stringify(accountsList));
+      }
+
+      // Save new user as logged in
+      localStorage.setItem('velora_current_user', JSON.stringify(newUser));
+
+      onRegisterComplete(newUser);
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setError('An error occurred during registration. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    accounts.push(newUser);
-    localStorage.setItem('velora_accounts', JSON.stringify(accounts));
-    localStorage.setItem('velora_current_user', JSON.stringify(newUser));
-
-    // Async sync to Firebase
-    syncUserToFirebase(newUser).catch(err => console.error('Firebase registration sync failed:', err));
-
-    onRegisterComplete(newUser);
   };
 
+  if (googlePendingUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-300">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-orange-400/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-zinc-800/10 dark:bg-orange-600/5 blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/50 rounded-3xl shadow-xl overflow-hidden p-8 relative transition-all duration-300">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center gap-2 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-orange-500 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-orange-500/20">
+                V
+              </div>
+              <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Velora</span>
+            </div>
+            <h3 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">Complete Google Wallet Setup</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Configure your borderless digital wallet credentials</p>
+          </div>
+
+          {error && (
+            <div className="p-3 mb-4 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleGoogleRegistrationSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-400">Verified Google Email</label>
+              <div className="px-4 py-3 bg-zinc-100 dark:bg-zinc-950/50 border border-slate-200/50 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl text-xs flex items-center justify-between font-medium">
+                <span>{googlePendingUser.email}</span>
+                <span className="text-[9px] font-black tracking-tight text-emerald-500 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  ✓ VERIFIED
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Username</label>
+              <input
+                type="text"
+                placeholder="e.g. marvelous"
+                value={pendingUsername}
+                onChange={(e) => setPendingUsername(e.target.value.replace(/\s+/g, '').toLowerCase())}
+                required
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">6-Digit Passcode PIN</label>
+              <input
+                type="password"
+                maxLength={6}
+                placeholder="••••••"
+                value={pendingPin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 6) setPendingPin(val);
+                }}
+                required
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs tracking-widest font-bold focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                Referral Code <span className="text-[10px] font-normal text-zinc-400">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Friend's Username"
+                value={pendingReferralCode}
+                onChange={(e) => setPendingReferralCode(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all placeholder:text-zinc-400/80"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white font-semibold rounded-2xl text-xs sm:text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-4"
+            >
+              {isLoading ? 'Creating wallet...' : 'Create Account & Log In'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setGooglePendingUser(null);
+                setError('');
+              }}
+              className="w-full py-2.5 bg-transparent border border-dashed border-slate-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-700 text-xs font-semibold rounded-2xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col justify-center items-center p-4 transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-300">
       {/* Background Graphic Accents */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-orange-400/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-zinc-800/10 dark:bg-orange-600/5 blur-[120px] pointer-events-none" />
 
-      {/* Main Framework Box */}
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/50 rounded-3xl shadow-xl overflow-hidden relative transition-all duration-300">
+      {/* Main Container */}
+      <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/50 rounded-3xl shadow-xl overflow-hidden relative transition-all duration-300">
         
         {/* Branding header */}
-        <div className="pt-8 pb-4 text-center">
-          <div className="inline-flex items-center justify-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-orange-500/20">
+        <div className="pt-8 pb-3 text-center px-6">
+          <div className="inline-flex items-center justify-center gap-2 mb-1.5">
+            <div className="w-9 h-9 rounded-2xl bg-orange-500 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-orange-500/20">
               V
             </div>
-            <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Velora</span>
+            <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Velora</span>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Your gorgeous borderless digital wallet</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Create your borderless multi-currency wallet in seconds</p>
         </div>
 
-        {/* Step Progress Bar */}
-        <div className="px-8 flex items-center justify-between gap-2 mb-6">
-          <div className="flex-1 h-1 rounded-full overflow-hidden bg-slate-100 dark:bg-zinc-800">
-            <div className={`h-full bg-orange-500 transition-all duration-300 ${step >= 1 ? 'w-full' : 'w-0'}`} />
-          </div>
-          <div className="flex-1 h-1 rounded-full overflow-hidden bg-slate-100 dark:bg-zinc-800">
-            <div className={`h-full bg-orange-500 transition-all duration-300 ${step >= 2 ? 'w-full' : 'w-0'}`} />
-          </div>
-          <div className="flex-1 h-1 rounded-full overflow-hidden bg-slate-100 dark:bg-zinc-800">
-            <div className={`h-full bg-orange-500 transition-all duration-300 ${step >= 3 ? 'w-full' : 'w-0'}`} />
-          </div>
-        </div>
+        {/* Form Container */}
+        <form onSubmit={handleRegister} className="px-6 sm:px-8 pb-8 space-y-4">
+          
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
+              {error}
+            </div>
+          )}
 
-        {/* Dynamic content with transitions */}
-        <div className="px-8 pb-8">
-          <AnimatePresence mode="wait">
+          {/* Grid Layout for Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                <h2 className="text-xl font-bold text-zinc-800 dark:text-white mb-2">Create Account</h2>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-6">
-                  Get started in seconds. No verification required for demo mode.
-                </p>
+            {/* Username */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Username</label>
+              <div className="relative">
+                <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="e.g. marvelous"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
+                  disabled={isLoading}
+                  required
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
+                />
+              </div>
+            </div>
 
-                <form onSubmit={handleStep1Submit} className="space-y-4">
-                  {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
-                      {error}
-                    </div>
-                  )}
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
+                <input
+                  type="email"
+                  placeholder="e.g. user@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  required
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
+                />
+              </div>
+            </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Username</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        placeholder="e.g. marvelous_olatunji"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
-                      />
-                    </div>
-                  </div>
+            {/* 6-Digit PIN passcode */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">6-Digit Passcode PIN</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="••••••"
+                  value={pin}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 6) setPin(val);
+                  }}
+                  disabled={isLoading}
+                  required
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-2xl text-xs tracking-widest font-bold focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
+                />
+              </div>
+            </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
-                      <input
-                        type="email"
-                        placeholder="e.g. user@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
-                      />
-                    </div>
-                  </div>
+            {/* Referral Code (Optional) */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                Referral Code <span className="text-[10px] font-normal text-zinc-400">(Optional)</span>
+              </label>
+              <div className="relative">
+                <Gift className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Friend's Username"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  disabled={isLoading}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-orange-500 dark:focus:border-orange-500 text-zinc-800 dark:text-white transition-all placeholder:text-zinc-400/80"
+                />
+              </div>
+            </div>
 
+          </div>
+
+          {/* Choose Avatar - Single Page Section */}
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Choose Visual Avatar</label>
+              <span className="text-[10px] font-medium text-orange-500 bg-orange-100/50 dark:bg-orange-950/20 px-2 py-0.5 rounded-full">
+                Customizes Dashboard
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {AVATAR_PRESETS.map((preset) => {
+                const isSelected = avatarId === preset.id;
+                return (
                   <button
-                    type="submit"
-                    className="w-full mt-6 py-3.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white font-semibold rounded-2xl text-sm transition-all shadow-lg shadow-zinc-900/10 dark:shadow-orange-500/10 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Continue <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-
-                <div className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
-                  Already have an account?{' '}
-                  <button
-                    onClick={onNavigateToLogin}
-                    className="text-orange-500 hover:underline font-semibold bg-transparent border-none cursor-pointer"
-                  >
-                    Log In
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                  <h2 className="text-xl font-bold text-zinc-800 dark:text-white">Choose Avatar</h2>
-                </div>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-6">
-                  Select a beautiful avatar to personalize your Velora dashboard layout.
-                </p>
-
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {AVATAR_PRESETS.map((preset) => {
-                    const isSelected = avatarId === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        onClick={() => setAvatarId(preset.id)}
-                        className={`p-4 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
-                          isSelected
-                            ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/30'
-                            : 'border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-slate-100 dark:hover:bg-zinc-850'
-                        }`}
-                      >
-                        <span className="text-3xl">{preset.emoji}</span>
-                        <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 text-center truncate w-full">
-                          {preset.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={handleStep2Submit}
-                  className="w-full py-3.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white font-semibold rounded-2xl text-sm transition-all shadow-lg shadow-zinc-900/10 dark:shadow-orange-500/10 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Configure PIN passcode <ArrowRight className="w-4 h-4" />
-                </button>
-              </motion.div>
-            )}
-
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col items-center"
-              >
-                <div className="w-full flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 self-start"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                  <h2 className="text-xl font-bold text-zinc-800 dark:text-white">6-Digit Passcode</h2>
-                </div>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mb-6 self-start">
-                  Secure your digital wallet with a standard numeric PIN code.
-                </p>
-
-                {error && (
-                  <div className="w-full p-3 mb-4 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
-                    {error}
-                  </div>
-                )}
-
-                {/* Bullets indicator */}
-                <div className="flex gap-4 mb-8">
-                  {Array.from({ length: 6 }).map((_, i) => {
-                    const isFilled = pin.length > i;
-                    return (
-                      <div
-                        key={i}
-                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-150 ${
-                          isFilled
-                            ? 'bg-orange-500 border-orange-500 scale-110 shadow-md shadow-orange-500/20'
-                            : 'border-slate-300 dark:border-zinc-700 bg-transparent'
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Custom numeric pad */}
-                <div className="grid grid-cols-3 gap-x-6 gap-y-4 max-w-[280px] w-full mb-8">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => handleDigitPress(num)}
-                      className="w-16 h-16 rounded-full border border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-slate-100 dark:hover:bg-zinc-850 text-xl font-bold text-zinc-800 dark:text-white flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                    >
-                      {num}
-                    </button>
-                  ))}
-                  <button
+                    key={preset.id}
                     type="button"
-                    onClick={handleBackspace}
-                    className="w-16 h-16 rounded-full text-sm font-semibold text-zinc-400 dark:text-zinc-500 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-zinc-850 transition-all cursor-pointer select-none"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDigitPress('0')}
-                    className="w-16 h-16 rounded-full border border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-slate-100 dark:hover:bg-zinc-850 text-xl font-bold text-zinc-800 dark:text-white flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRegister}
-                    disabled={pin.length !== 6}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all select-none ${
-                      pin.length === 6
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95'
-                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-600 cursor-not-allowed'
+                    onClick={() => setAvatarId(preset.id)}
+                    disabled={isLoading}
+                    className={`p-2.5 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                      isSelected
+                        ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/30'
+                        : 'border-slate-100 dark:border-zinc-850 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-slate-100 dark:hover:bg-zinc-850'
                     }`}
                   >
-                    <CheckCircle2 className="w-6 h-6" />
+                    <span className="text-xl sm:text-2xl">{preset.emoji}</span>
+                    <span className="text-[8px] font-medium text-zinc-500 dark:text-zinc-400 text-center truncate w-full">
+                      {preset.label}
+                    </span>
                   </button>
-                </div>
-              </motion.div>
-            )}
+                );
+              })}
+            </div>
+          </div>
 
-          </AnimatePresence>
-        </div>
+          {/* Referral Reward Callout Banner */}
+          <div className="p-3 bg-orange-500/5 dark:bg-orange-500/5 border border-orange-500/20 rounded-2xl flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-orange-500 flex items-center justify-center text-white shrink-0">
+              <Gift className="w-4 h-4" />
+            </div>
+            <p className="text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-400 leading-tight">
+              <strong className="text-orange-500 dark:text-orange-400 font-semibold">Velora Partner Rewards:</strong> Input a friend's referral code to unlock ₦2,000 instant welcome bonus! Your friend gets ₦3,000 commission.
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 disabled:bg-zinc-400 dark:disabled:bg-zinc-700 text-white font-semibold rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-zinc-900/10 dark:shadow-orange-500/10 flex items-center justify-center gap-2 cursor-pointer mt-4"
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Creating your wallet...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 justify-center w-full">
+                Create Account & Claim Bonus <ArrowRight className="w-4 h-4" />
+              </span>
+            )}
+          </button>
+
+          <div className="relative my-4 flex items-center justify-center">
+            <div className="border-t border-slate-100 dark:border-zinc-800/80 w-full absolute" />
+            <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 relative z-10 uppercase tracking-wider">
+              Or Register With
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+            className="w-full py-3 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-slate-200 dark:border-zinc-850 text-zinc-700 dark:text-zinc-300 font-semibold rounded-2xl text-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm hover:shadow-md"
+          >
+            {isLoading ? (
+              <span className="w-4 h-4 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.35 1 3.37 3.65 1.39 7.5l3.85 2.99C6.16 6.88 8.87 5.04 12 5.04z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.09 2.66-2.31 3.48l3.6 2.79c2.1-1.94 3.3-4.8 3.3-8.42z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.24 14.51c-.24-.72-.38-1.5-.38-2.31s.14-1.59.38-2.31L1.39 7.5C.5 9.3 0 11.1 0 13s.5 3.7 1.39 5.5l3.85-2.99z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c3.24 0 5.97-1.09 7.96-2.96l-3.6-2.79c-.99.66-2.26 1.07-3.6 1.07-3.13 0-5.84-1.84-6.76-4.51L1.39 16.8C3.37 20.35 7.35 23 12 23z"
+                />
+              </svg>
+            )}
+            <span>Google Account</span>
+          </button>
+
+          {/* Navigate to Login link */}
+          <div className="text-center text-xs text-zinc-400 dark:text-zinc-500 pt-2">
+            Already have an account?{' '}
+            <button
+              type="button"
+              onClick={onNavigateToLogin}
+              disabled={isLoading}
+              className="text-orange-500 hover:underline font-semibold bg-transparent border-none cursor-pointer"
+            >
+              Log In
+            </button>
+          </div>
+
+        </form>
       </div>
     </div>
   );

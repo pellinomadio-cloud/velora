@@ -17,6 +17,7 @@ import {
   HelpCircle,
   Home,
   QrCode,
+  Gift,
   CreditCard,
   User as UserIcon,
   Globe,
@@ -1223,6 +1224,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   user={user}
                   onDeductBalance={handleDeductBalance}
                   onAddTransaction={addTransaction}
+                  onUpdateUser={updateGlobalUser}
                 />
               </motion.div>
             )}
@@ -1301,7 +1303,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
             <span className="text-[10px] font-bold tracking-wide">eSIM</span>
           </button>
 
-          {/* Tab 3: Scan Pay */}
+          {/* Tab 3: Referral */}
           <button
             onClick={() => setActiveTab('scan')}
             className={`flex flex-col items-center gap-1 select-none cursor-pointer transition-all ${
@@ -1309,9 +1311,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
             }`}
           >
             <div className={`p-1.5 rounded-full ${activeTab === 'scan' ? 'bg-white/10' : ''}`}>
-              <QrCode className="w-4 h-4" />
+              <Gift className="w-4 h-4" />
             </div>
-            <span className="text-[10px] font-bold tracking-wide">Scan Pay</span>
+            <span className="text-[10px] font-bold tracking-wide">Referral</span>
           </button>
 
           {/* Tab 4: Card */}
