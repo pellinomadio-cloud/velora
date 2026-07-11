@@ -8,6 +8,7 @@ export interface User {
   joinedAt: string;
   darkMode: boolean;
   kycStatus?: 'unverified' | 'pending' | 'verified';
+  kycPlan?: 'two_key' | 'three_key' | 'unlimited';
   kycPaymentProof?: string;
   cardActivationStatus?: 'unverified' | 'pending' | 'verified';
   cardActivationProof?: string;

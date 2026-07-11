@@ -25,6 +25,7 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
   const [companyAccountNum, setCompanyAccountNum] = useState('0123958373');
   const [companyAccountName, setCompanyAccountName] = useState('Velora Fintech Solutions');
   const [companyFee, setCompanyFee] = useState(7500);
+  const [companySupportLink, setCompanySupportLink] = useState('https://t.me/VeloraSupportDesk');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         setCompanyAccountNum(parsed.accountNumber || '0123958373');
         setCompanyAccountName(parsed.accountName || 'Velora Fintech Solutions');
         setCompanyFee(parsed.fee || 7500);
+        setCompanySupportLink(parsed.supportLink || 'https://t.me/VeloraSupportDesk');
       } catch (e) {}
     }
   }, []);
@@ -46,6 +48,7 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
       accountNumber: companyAccountNum,
       accountName: companyAccountName,
       fee: companyFee,
+      supportLink: companySupportLink,
     };
     localStorage.setItem('velora_company_account', JSON.stringify(data));
     setSaveSuccess(true);
@@ -423,6 +426,16 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
                     />
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block">Support Telegram Link</label>
+                    <input
+                      type="text"
+                      value={companySupportLink}
+                      onChange={(e) => setCompanySupportLink(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800 rounded-2xl text-xs font-bold text-zinc-850 dark:text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+
                   {saveSuccess && (
                     <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-100/30 flex items-center gap-1.5 animate-pulse">
                       <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -504,6 +517,11 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
                               }`}>
                                 {isKycType ? 'KYC: ' : 'CARD: '}{statusVal.toUpperCase()}
                               </span>
+                              {isKycType && usr.kycPlan && (
+                                <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 dark:bg-amber-500/5 text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase">
+                                  {usr.kycPlan === 'two_key' ? '2 Keys (₦7.5k)' : usr.kycPlan === 'three_key' ? '3 Keys (₦10.75k)' : 'Unlimited (₦17.8k)'}
+                                </span>
+                              )}
                               {usr.isBanned && (
                                 <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-red-650 text-white animate-pulse uppercase">
                                   BANNED

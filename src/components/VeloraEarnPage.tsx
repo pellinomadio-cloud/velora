@@ -141,10 +141,26 @@ export default function VeloraEarnPage({
         <div className="p-3 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-2xl flex flex-col justify-between shadow-sm min-h-[85px]">
           <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wider">Daily Limit</span>
           <div className="mt-2">
-            <p className={`text-lg font-black leading-none ${joinedTodayCount >= 3 ? 'text-amber-500' : 'text-zinc-800 dark:text-white'}`}>
-              {3 - joinedTodayCount} <span className="text-[10px] text-zinc-400 font-normal">left</span>
-            </p>
-            <p className="text-[8px] text-zinc-400 mt-1">3 maximum daily</p>
+            {(() => {
+              const getLimit = () => {
+                if (user.kycStatus !== 'verified') return 1;
+                if (user.kycPlan === 'two_key') return 2;
+                if (user.kycPlan === 'three_key') return 3;
+                if (user.kycPlan === 'unlimited') return Infinity;
+                return 3;
+              };
+              const limit = getLimit();
+              return (
+                <>
+                  <p className={`text-lg font-black leading-none ${limit !== Infinity && joinedTodayCount >= limit ? 'text-amber-500' : 'text-zinc-800 dark:text-white'}`}>
+                    {limit === Infinity ? '∞' : limit - joinedTodayCount} <span className="text-[10px] text-zinc-400 font-normal">left</span>
+                  </p>
+                  <p className="text-[8px] text-zinc-400 mt-1">
+                    {limit === Infinity ? 'Unlimited joins daily' : `${limit} maximum daily`}
+                  </p>
+                </>
+              );
+            })()}
           </div>
         </div>
 

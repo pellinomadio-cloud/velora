@@ -5,7 +5,7 @@ import { User } from '../types';
 interface KYCPageProps {
   user: User;
   onBack: () => void;
-  onSubmitKYC: (proofBase64: string) => void;
+  onSubmitKYC: (proofBase64: string, plan: 'two_key' | 'three_key' | 'unlimited') => void;
 }
 
 const LOADING_STEPS = [
@@ -23,6 +23,7 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
   const [dragActive, setDragActive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingError, setSubmittingError] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<'two_key' | 'three_key' | 'unlimited'>('two_key');
 
   // Dynamic company payment details from localStorage (modifiable by Admin)
   const [accountDetails, setAccountDetails] = useState(() => {
@@ -42,19 +43,29 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
     };
   });
 
-  // Dynamic fee calculation based on user balance
-  const getDynamicKycFee = () => {
-    const baseFee = accountDetails.fee;
+  // Dynamic plan fee calculation based on user balance and selected plan
+  const getDynamicPlanFee = (planId: 'two_key' | 'three_key' | 'unlimited') => {
+    let basePlanFee = 7500;
+    if (planId === 'three_key') basePlanFee = 10750;
+    if (planId === 'unlimited') basePlanFee = 17800;
+
+    // Apply scaling increment if balance >= 100,000
     const userBalance = user.balance;
     if (userBalance >= 100000) {
-      const baseIncreasedFee = 11500;
-      // Add 2,000 Naira for every 50,000 Naira increment above 100,000 Naira
+      const baseIncrease = 4000; // 11,500 - 7,500
       const extraSteps = Math.floor((userBalance - 100000) / 50000);
-      return baseIncreasedFee + (extraSteps * 2000);
+      const totalIncrease = baseIncrease + (extraSteps * 2000);
+      return basePlanFee + totalIncrease;
     }
-    return baseFee;
+    return basePlanFee;
   };
-  const dynamicFee = getDynamicKycFee();
+
+  const getPlanName = (plan?: string) => {
+    if (plan === 'two_key') return 'Basic (2 Keys/day)';
+    if (plan === 'three_key') return 'Premium (3 Keys/day)';
+    if (plan === 'unlimited') return 'Unlimited (Unlimited Keys/day)';
+    return 'Verification';
+  };
 
   // 7-second unlocking state machine
   const [unlockState, setUnlockState] = useState<'locked' | 'unlocking' | 'unlocked'>(() => {
@@ -164,10 +175,12 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
     setIsSubmitting(true);
     // Simulate slight submission delay for realism
     setTimeout(() => {
-      onSubmitKYC(proof);
+      onSubmitKYC(proof, selectedPlan);
       setIsSubmitting(false);
     }, 1200);
   };
+
+  const pendingFee = getDynamicPlanFee(user.kycPlan || 'two_key');
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-900 transition-colors duration-300">
@@ -192,8 +205,8 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
           </div>
           <h3 className="text-lg font-extrabold text-zinc-800 dark:text-white">KYC Verification Pending</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
-            Your ₦{dynamicFee.toLocaleString()} activation payment proof is currently being reviewed by our compliance administrators. 
-            Once approved, your account limits and trading options will be unlocked immediately.
+            Your payment proof for the <strong className="font-extrabold text-amber-600 dark:text-amber-400">{getPlanName(user.kycPlan)}</strong> activation fee of <strong className="font-bold">₦{pendingFee.toLocaleString()}</strong> is currently being reviewed by our compliance administrators. 
+            Once approved, your account benefits and daily passive pools will be unlocked immediately.
           </p>
           <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-slate-100 dark:border-zinc-800 w-full text-left">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Uploaded Proof:</span>
@@ -269,13 +282,66 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
       ) : (
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 pb-6">
           {/* Promo Card */}
-          <div className="p-4 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-3xl shadow-md space-y-1.5 relative overflow-hidden">
-            <div className="absolute top-[-30%] right-[-10%] w-[50%] h-[120%] bg-white/10 rounded-full blur-xl pointer-events-none" />
-            <h3 className="text-xs font-bold uppercase tracking-wider opacity-90">One-time Activation Fee</h3>
-            <p className="text-2xl font-black">₦{dynamicFee.toLocaleString()}</p>
-            <p className="text-[10px] opacity-80 leading-relaxed">
-              Pay the KYC activation fee of ₦{dynamicFee.toLocaleString()} into our bank account below and upload your transfer slip to unlock full trading, virtual cards, and digital features.
+          <div className="p-4 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-zinc-950 rounded-3xl shadow-md space-y-1.5 relative overflow-hidden">
+            <div className="absolute top-[-30%] right-[-10%] w-[50%] h-[120%] bg-white/20 rounded-full blur-xl pointer-events-none" />
+            <h3 className="text-xs font-black uppercase tracking-wider opacity-90">One-time Activation Fee</h3>
+            <p className="text-2xl font-black text-zinc-950">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</p>
+            <p className="text-[10px] opacity-90 leading-relaxed font-semibold">
+              Pay the {selectedPlan === 'two_key' ? 'Basic' : selectedPlan === 'three_key' ? 'Premium' : 'Unlimited'} KYC activation fee of <strong className="font-black">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</strong> into our bank account below and upload your transfer slip to unlock daily revenue passive pools.
             </p>
+          </div>
+
+          {/* Plan Selector */}
+          <div className="space-y-2.5">
+            <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block">Select KYC Plan & Benefits</label>
+            <div className="grid grid-cols-1 gap-2.5">
+              {[
+                {
+                  id: 'two_key',
+                  name: 'Basic Revenue Partner',
+                  price: getDynamicPlanFee('two_key'),
+                  benefits: '2 keys for joining two revenue per day'
+                },
+                {
+                  id: 'three_key',
+                  name: 'Premium Revenue Partner',
+                  price: getDynamicPlanFee('three_key'),
+                  benefits: 'Benefit for joining three revenue per day'
+                },
+                {
+                  id: 'unlimited',
+                  name: 'Unlimited Revenue Partner',
+                  price: getDynamicPlanFee('unlimited'),
+                  benefits: 'Unlimited joining of revenue per day'
+                }
+              ].map((plan) => {
+                const isSelected = selectedPlan === plan.id;
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setSelectedPlan(plan.id as any)}
+                    className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? 'border-amber-500 bg-amber-500/5 dark:bg-amber-500/10 shadow-sm'
+                        : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center w-full">
+                      <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                        {plan.name}
+                      </span>
+                      <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-900 dark:text-white'}`}>
+                        ₦{plan.price.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">
+                      {plan.benefits}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* OPay Strict Prohibition Warning Card */}

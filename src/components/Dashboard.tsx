@@ -31,7 +31,9 @@ import {
   Building,
   Search,
   History,
-  ArrowLeft
+  ArrowLeft,
+  ShieldCheck,
+  MessageCircle
 } from 'lucide-react';
 import { User, Transaction, ESimPlan } from '../types';
 import { EARN_COMPANIES, EarnCompany } from '../data/companies';
@@ -82,10 +84,11 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }
   };
 
-  const handleKycSubmit = (proofBase64: string) => {
+  const handleKycSubmit = (proofBase64: string, plan: 'two_key' | 'three_key' | 'unlimited') => {
     const updatedUser: User = {
       ...user,
       kycStatus: 'pending',
+      kycPlan: plan,
       kycPaymentProof: proofBase64,
     };
     updateGlobalUser(updatedUser);
@@ -468,11 +471,21 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }, 2000);
   };
 
+  const getUserDailyJoinLimit = (u: User) => {
+    if (u.kycStatus !== 'verified') {
+      return 1;
+    }
+    if (u.kycPlan === 'two_key') return 2;
+    if (u.kycPlan === 'three_key') return 3;
+    if (u.kycPlan === 'unlimited') return Infinity;
+    return 3; // Default fallback
+  };
+
   // Joint Company handler for Velora Earn
   const handleJoinCompany = (companyId: string): string | null => {
     if (user.kycStatus !== 'verified') {
       if (joinedCompanies.length >= 1) {
-        return "KYC Account Activation Required! Unverified trial accounts are limited to exactly 1 passive revenue pool. Please complete your KYC verification to join unlimited pools.";
+        return "KYC Account Activation Required! Unverified trial accounts can only join a revenue pool once. Please complete your KYC Verification to unlock daily revenue pools.";
       }
     }
 
@@ -490,8 +503,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
       }
     }
 
-    if (currentCount >= 3) {
-      return "Daily limit reached! You can only join up to 3 companies per day.";
+    const dailyLimit = getUserDailyJoinLimit(user);
+    if (currentCount >= dailyLimit) {
+      return `Daily limit reached! Your plan allows up to ${dailyLimit === Infinity ? 'unlimited' : dailyLimit} joins per day. Upgrade your KYC Plan to get more keys.`;
     }
 
     const newJoin = { companyId, joinedAt: new Date().toISOString() };
@@ -875,30 +889,40 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                       <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Withdraw</span>
                     </button>
 
-                    {/* Action 2: Data */}
+                    {/* Action 2: KYC */}
                     <button
                       onClick={() => {
-                        setCurrentScreen('data');
+                        setCurrentScreen('kyc');
                       }}
                       className="flex flex-col items-center gap-1.5 group cursor-pointer"
                     >
-                      <div className="w-11 h-11 rounded-full bg-white/10 dark:bg-zinc-800/80 group-hover:bg-orange-500/20 group-hover:text-orange-400 flex items-center justify-center text-white transition-all">
-                        <Wifi className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-full bg-amber-500/10 dark:bg-amber-500/5 ring-1 ring-amber-500/20 group-hover:ring-amber-500/40 group-hover:bg-amber-500/25 group-hover:text-amber-400 flex items-center justify-center text-amber-500 dark:text-amber-400 transition-all">
+                        <ShieldCheck className="w-4 h-4 text-amber-500 dark:text-amber-400" />
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Data</span>
+                      <span className="text-[10px] font-bold text-amber-500 dark:text-amber-400 tracking-wide">KYC</span>
                     </button>
 
-                    {/* Action 3: Airtime */}
+                    {/* Action 3: Support */}
                     <button
                       onClick={() => {
-                        setCurrentScreen('airtime');
+                        let link = 'https://t.me/VeloraSupportDesk';
+                        const saved = localStorage.getItem('velora_company_account');
+                        if (saved) {
+                          try {
+                            const parsed = JSON.parse(saved);
+                            if (parsed.supportLink) {
+                              link = parsed.supportLink;
+                            }
+                          } catch (e) {}
+                        }
+                        window.open(link, '_blank', 'noopener,noreferrer');
                       }}
                       className="flex flex-col items-center gap-1.5 group cursor-pointer"
                     >
-                      <div className="w-11 h-11 rounded-full bg-white/10 dark:bg-zinc-800/80 group-hover:bg-orange-500/20 group-hover:text-orange-400 flex items-center justify-center text-white transition-all">
-                        <Phone className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-full bg-sky-500/10 dark:bg-sky-500/5 ring-1 ring-sky-500/20 group-hover:ring-sky-500/40 group-hover:bg-sky-500/25 group-hover:text-sky-400 flex items-center justify-center text-sky-500 dark:text-sky-400 transition-all">
+                        <MessageCircle className="w-4 h-4 text-sky-500 dark:text-sky-400" />
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Airtime</span>
+                      <span className="text-[10px] font-bold text-sky-500 dark:text-sky-400 tracking-wide">Support</span>
                     </button>
 
                     {/* Action 4: Velora Earn */}
@@ -1620,7 +1644,11 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-zinc-400 font-semibold">Today's Remaining Joins:</span>
-                            <span className="font-black text-emerald-500">{3 - joinedTodayCount} of 3 left</span>
+                            <span className="font-black text-emerald-500">
+                              {getUserDailyJoinLimit(user) === Infinity 
+                                ? 'Unlimited Keys' 
+                                : `${Math.max(0, getUserDailyJoinLimit(user) - joinedTodayCount)} of ${getUserDailyJoinLimit(user)} left`}
+                            </span>
                           </div>
                           <div className="h-[1px] bg-slate-200 dark:bg-zinc-800" />
                           <div className="flex justify-between items-center text-xs">
