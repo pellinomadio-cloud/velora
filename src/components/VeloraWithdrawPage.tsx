@@ -24,9 +24,11 @@ export default function VeloraWithdrawPage({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Auto-resolve account name for withdrawals on entering 10 digits
-  useEffect(() => {
-    if (withdrawAccountNum.length === 10) {
+  // Auto-resolve account name helper when account number is exactly 10 digits
+  const handleAccountNumChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '');
+    setWithdrawAccountNum(val);
+    if (val.length === 10) {
       const names = [
         'MARVELOUS OLATUNJI',
         'CHINEDU OKAFOR',
@@ -38,12 +40,10 @@ export default function VeloraWithdrawPage({
         'OLUWASEUN ADIGUN',
       ];
       // Deterministic based on account number digits
-      const index = parseInt(withdrawAccountNum) % names.length;
+      const index = parseInt(val) % names.length;
       setWithdrawAccountName(names[index]);
-    } else {
-      setWithdrawAccountName('');
     }
-  }, [withdrawAccountNum]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,6 +89,7 @@ export default function VeloraWithdrawPage({
     setSuccess(true);
     setWithdrawAmount('');
     setWithdrawAccountNum('');
+    setWithdrawAccountName('');
   };
 
   const isKycVerified = user.kycStatus === 'verified';
@@ -199,25 +200,27 @@ export default function VeloraWithdrawPage({
                 required
                 placeholder="10-digit NUBAN Number"
                 value={withdrawAccountNum}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setWithdrawAccountNum(val);
-                }}
+                onChange={handleAccountNumChange}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white font-mono"
               />
             </div>
 
-            {withdrawAccountName && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-950/50 rounded-2xl flex items-center gap-2.5">
-                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Resolved Account Name</p>
-                  <p className="text-xs font-extrabold text-zinc-800 dark:text-emerald-400">
-                    {withdrawAccountName}
-                  </p>
-                </div>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase">Account Name</label>
+              <input
+                type="text"
+                required
+                placeholder="Enter Beneficiary Account Name"
+                value={withdrawAccountName}
+                onChange={(e) => setWithdrawAccountName(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white"
+              />
+              {withdrawAccountNum.length === 10 && (
+                <p className="text-[9px] text-emerald-500 flex items-center gap-1 mt-0.5 px-1 font-semibold">
+                  <CheckCircle className="w-3 h-3 text-emerald-500 inline" /> Auto-resolved suggestion loaded. Feel free to edit.
+                </p>
+              )}
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-zinc-400 uppercase">Amount to Withdraw (₦)</label>

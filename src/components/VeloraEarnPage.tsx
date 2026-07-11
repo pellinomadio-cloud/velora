@@ -32,9 +32,25 @@ export default function VeloraEarnPage({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const getActiveJoinedCompanies = () => {
+    return joinedCompanies.filter((jc) => {
+      if (user.kycStatus !== 'verified') {
+        const elapsedMs = Date.now() - new Date(jc.joinedAt).getTime();
+        const isExpired = elapsedMs > 24 * 60 * 60 * 1000;
+        return !isExpired;
+      }
+      return true;
+    });
+  };
+
   const activeDetails = EARN_COMPANIES.filter((c) =>
-    joinedCompanies.some((jc) => jc.companyId === c.id)
+    getActiveJoinedCompanies().some((jc) => jc.companyId === c.id)
   );
+
+  const hasExpiredEarn = user.kycStatus !== 'verified' && joinedCompanies.some((jc) => {
+    const elapsedMs = Date.now() - new Date(jc.joinedAt).getTime();
+    return elapsedMs > 24 * 60 * 60 * 1000;
+  });
 
   const totalDailyEarning = activeDetails.reduce((sum, c) => sum + c.dailyEarning, 0);
 
@@ -100,7 +116,7 @@ export default function VeloraEarnPage({
           <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wider">Active Pools</span>
           <div className="mt-2">
             <p className="text-lg font-black text-zinc-850 dark:text-white leading-none">
-              {joinedCompanies.length}
+              {getActiveJoinedCompanies().length}
             </p>
             <p className="text-[8px] text-zinc-400 mt-1">Pool partnerships</p>
           </div>
@@ -165,6 +181,22 @@ export default function VeloraEarnPage({
         </motion.div>
       )}
 
+      {hasExpiredEarn && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-xs rounded-2xl border-2 border-amber-250 dark:border-amber-900/30 flex items-start gap-3"
+        >
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+          <div className="space-y-1 text-left">
+            <h5 className="text-[11px] font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wider">⚠️ TRIAL REVENUE EXPIRED (KYC REQUIRED)</h5>
+            <p className="text-[10px] text-amber-600 dark:text-amber-450 leading-relaxed font-semibold">
+              Your 24-hour trial period has expired. Your active revenue pool has ceased earning and you cannot join any other pools until you complete your <span className="font-extrabold underline">KYC Account Activation</span>.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* 3. FILTERS */}
       <div className="space-y-3">
         <div className="relative">
@@ -206,7 +238,9 @@ export default function VeloraEarnPage({
 
         <div className="space-y-2.5">
           {filteredCompanies.map((co) => {
-            const isJoined = joinedCompanies.some((jc) => jc.companyId === co.id);
+            const jc = joinedCompanies.find((jc) => jc.companyId === co.id);
+            const isJoined = !!jc;
+            const isExpired = !!(jc && user.kycStatus !== 'verified' && (Date.now() - new Date(jc.joinedAt).getTime() > 24 * 60 * 60 * 1000));
             return (
               <div
                 key={co.id}
@@ -237,12 +271,14 @@ export default function VeloraEarnPage({
                   disabled={isJoined}
                   onClick={() => handleJoinClick(co.id)}
                   className={`px-3.5 py-2 rounded-xl text-[10px] font-black transition-all shrink-0 cursor-pointer ${
-                    isJoined
-                      ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100/50 dark:border-emerald-950/50 cursor-default'
-                      : 'bg-zinc-950 hover:bg-zinc-850 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-sm'
+                    isExpired
+                      ? 'bg-red-50 dark:bg-red-950/25 text-red-650 dark:text-red-450 border border-red-100/50 dark:border-red-950/50 cursor-default'
+                      : isJoined
+                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100/50 dark:border-emerald-950/50 cursor-default'
+                        : 'bg-zinc-950 hover:bg-zinc-850 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-sm'
                   }`}
                 >
-                  {isJoined ? 'Active ✔' : 'Join Pool'}
+                  {isExpired ? 'Expired ⏳' : isJoined ? 'Active ✔' : 'Join Pool'}
                 </button>
               </div>
             );

@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Sparkles,
   ShieldAlert,
+  AlertCircle,
   Briefcase,
   Building,
   Search,
@@ -53,9 +54,10 @@ interface DashboardProps {
   onLogout: () => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
+  onUpdateUser?: (updated: User) => void;
 }
 
-export default function Dashboard({ user: initialUser, onLogout, darkMode, onToggleDarkMode }: DashboardProps) {
+export default function Dashboard({ user: initialUser, onLogout, darkMode, onToggleDarkMode, onUpdateUser }: DashboardProps) {
   // Current user local state
   const [user, setUser] = useState<User>(initialUser);
 
@@ -69,7 +71,11 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     const current = localStorage.getItem('velora_current_user');
     if (current) {
       try {
-        setUser(JSON.parse(current));
+        const parsed = JSON.parse(current);
+        setUser(parsed);
+        if (onUpdateUser) {
+          onUpdateUser(parsed);
+        }
       } catch (e) {
         console.error('Failed to reload user from storage', e);
       }
@@ -190,6 +196,18 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   const [modalError, setModalError] = useState('');
   const [modalSuccess, setModalSuccess] = useState(false);
 
+  // Helper to get active companies (non-expired)
+  const getActiveJoinedCompanies = () => {
+    return joinedCompanies.filter((jc) => {
+      if (user.kycStatus !== 'verified') {
+        const elapsedMs = Date.now() - new Date(jc.joinedAt).getTime();
+        const isExpired = elapsedMs > 24 * 60 * 60 * 1000;
+        return !isExpired;
+      }
+      return true;
+    });
+  };
+
   // Auto-resolve account name for withdrawals on entering 10 digits
   useEffect(() => {
     if (withdrawAccountNum.length === 10) {
@@ -219,7 +237,14 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
       if (elapsedMs > 5000) { // If away for more than 5 seconds
         const elapsedSeconds = elapsedMs / 1000;
         const activeDetails = EARN_COMPANIES.filter((c) =>
-          joinedCompanies.some((jc) => jc.companyId === c.id)
+          joinedCompanies.some((jc) => {
+            if (user.kycStatus !== 'verified') {
+              const elapsedMs = Date.now() - new Date(jc.joinedAt).getTime();
+              const isExpired = elapsedMs > 24 * 60 * 60 * 1000;
+              return jc.companyId === c.id && !isExpired;
+            }
+            return jc.companyId === c.id;
+          })
         );
         
         if (activeDetails.length > 0) {
@@ -285,7 +310,14 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     // 2. Real-time active simulation loop
     const interval = setInterval(() => {
       const activeDetails = EARN_COMPANIES.filter((c) =>
-        joinedCompanies.some((jc) => jc.companyId === c.id)
+        joinedCompanies.some((jc) => {
+          if (user.kycStatus !== 'verified') {
+            const elapsedMs = Date.now() - new Date(jc.joinedAt).getTime();
+            const isExpired = elapsedMs > 24 * 60 * 60 * 1000;
+            return jc.companyId === c.id && !isExpired;
+          }
+          return jc.companyId === c.id;
+        })
       );
       if (activeDetails.length === 0) {
         localStorage.setItem(`velora_last_active_time_${user.email}`, Date.now().toString());
@@ -317,7 +349,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [joinedCompanies, user.email]);
+  }, [joinedCompanies, user.email, user.kycStatus]);
 
   // Load and save accounts/transactions locally
   useEffect(() => {
@@ -339,6 +371,10 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     if (index !== -1) {
       accounts[index] = updated;
       localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+    }
+
+    if (onUpdateUser) {
+      onUpdateUser(updated);
     }
   };
 
@@ -434,6 +470,12 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
   // Joint Company handler for Velora Earn
   const handleJoinCompany = (companyId: string): string | null => {
+    if (user.kycStatus !== 'verified') {
+      if (joinedCompanies.length >= 1) {
+        return "KYC Account Activation Required! Unverified trial accounts are limited to exactly 1 passive revenue pool. Please complete your KYC verification to join unlimited pools.";
+      }
+    }
+
     if (joinedCompanies.some(c => c.companyId === companyId)) {
       return "You have already joined this company!";
     }
@@ -1572,7 +1614,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-850/80 flex flex-col gap-3">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-zinc-400 font-semibold">Active Joined Pools:</span>
-                            <span className="font-black text-orange-500">{joinedCompanies.length} Revenue Pools</span>
+                            <span className="font-black text-orange-500">
+                              {getActiveJoinedCompanies().length} of {joinedCompanies.length} Pools
+                            </span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-zinc-400 font-semibold">Today's Remaining Joins:</span>
@@ -1585,7 +1629,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                               Estimated Passive Earning:
                             </span>
                             <span className="font-black text-emerald-500">
-                              +₦{EARN_COMPANIES.filter(c => joinedCompanies.some(jc => jc.companyId === c.id))
+                              +₦{EARN_COMPANIES.filter(c => getActiveJoinedCompanies().some(jc => jc.companyId === c.id))
                                 .reduce((sum, c) => sum + c.dailyEarning, 0)
                                 .toLocaleString('en-US', { minimumFractionDigits: 2 })}/day
                             </span>
@@ -1594,6 +1638,19 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                             Joined pools automatically stream Naira directly to your live wallet balance every few seconds.
                           </p>
                         </div>
+
+                        {/* Expired Pool Warning Banner */}
+                        {user.kycStatus !== 'verified' && joinedCompanies.some((jc) => Date.now() - new Date(jc.joinedAt).getTime() > 24 * 60 * 60 * 1000) && (
+                          <div className="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-[10px] rounded-xl border border-amber-200 dark:border-amber-900/30 flex items-start gap-2 text-left font-semibold">
+                            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                            <div>
+                              <p className="font-extrabold text-[11px] uppercase tracking-wide text-amber-850 dark:text-amber-450">⚠️ Trial Revenue Expired</p>
+                              <p className="mt-0.5 leading-relaxed text-amber-600 dark:text-amber-400">
+                                Your 24-hour trial period has ended. Your active pool has ceased earning. Complete your <strong className="font-bold underline">KYC Verification</strong> to unlock unlimited passive income.
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Search and Category Filter */}
                         <div className="space-y-2">
@@ -1634,7 +1691,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                             const matchSector = earnSector === 'All' || c.sector === earnSector;
                             return matchSearch && matchSector;
                           }).map((co) => {
-                            const isJoined = joinedCompanies.some((jc) => jc.companyId === co.id);
+                            const jc = joinedCompanies.find((jc) => jc.companyId === co.id);
+                            const isJoined = !!jc;
+                            const isExpired = !!(jc && user.kycStatus !== 'verified' && (Date.now() - new Date(jc.joinedAt).getTime() > 24 * 60 * 60 * 1000));
                             return (
                               <div
                                 key={co.id}
@@ -1659,12 +1718,14 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                                   disabled={isJoined}
                                   onClick={() => handleJoinCompany(co.id)}
                                   className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all shrink-0 cursor-pointer ${
-                                    isJoined
-                                      ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 cursor-default'
-                                      : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white'
+                                    isExpired
+                                      ? 'bg-red-100 dark:bg-red-950/30 text-red-650 dark:text-red-400 cursor-default'
+                                      : isJoined
+                                        ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 cursor-default'
+                                        : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white'
                                   }`}
                                 >
-                                  {isJoined ? 'Joined ✔' : 'Join Pool'}
+                                  {isExpired ? 'Expired ⏳' : isJoined ? 'Joined ✔' : 'Join Pool'}
                                 </button>
                               </div>
                             );

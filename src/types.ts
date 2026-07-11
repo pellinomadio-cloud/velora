@@ -11,6 +11,7 @@ export interface User {
   kycPaymentProof?: string;
   cardActivationStatus?: 'unverified' | 'pending' | 'verified';
   cardActivationProof?: string;
+  isBanned?: boolean;
 }
 
 export interface Transaction {

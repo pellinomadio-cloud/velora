@@ -419,8 +419,22 @@ const RAW_EARN_COMPANIES: EarnCompany[] = [
   }
 ];
 
-export const EARN_COMPANIES: EarnCompany[] = RAW_EARN_COMPANIES.map((co) => ({
-  ...co,
-  dailyEarning: co.dailyEarning * 35,
-}));
+export const EARN_COMPANIES: EarnCompany[] = RAW_EARN_COMPANIES.map((co) => {
+  // Map raw daily earning linearly from [3600, 17500] to [20000, 50000]
+  const minRaw = 3600;
+  const maxRaw = 17500;
+  const minTarget = 20000;
+  const maxTarget = 50000;
+  
+  const fraction = (co.dailyEarning - minRaw) / (maxRaw - minRaw);
+  const target = minTarget + fraction * (maxTarget - minTarget);
+  
+  // Round to nearest 100 Naira
+  const dailyEarning = Math.round(target / 100) * 100;
+  
+  return {
+    ...co,
+    dailyEarning,
+  };
+});
 
