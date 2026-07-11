@@ -37,7 +37,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
   };
 
   const handleCopyLink = () => {
-    const link = `https://velorapay.com/register?ref=${user.username.toLowerCase()}`;
+    const link = `https://volerapay.com/register?ref=${user.username.toLowerCase()}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -131,7 +131,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
         id: `TX-WEL-${Math.floor(100000 + Math.random() * 900000)}`,
         type: 'deposit',
         title: 'Referral Welcome Bonus',
-        subtitle: `Welcome to Velora! Invited by @${user.username}`,
+        subtitle: `Welcome to Volerapay! Invited by @${user.username}`,
         amount: 2000,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         status: 'completed',
@@ -204,10 +204,10 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
           </div>
           <div className="space-y-1 text-center md:text-left">
             <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white tracking-tight flex items-center justify-center md:justify-start gap-2">
-              Velora Partner Rewards
+              Volerapay Partner Rewards
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Invite partners to Velora. Get <strong className="text-orange-500 font-bold">₦3,000</strong> commission on sign-up. They get <strong className="text-orange-500 font-bold">₦2,000</strong> welcome bonus instantly!
+              Invite partners to Volerapay. Get <strong className="text-orange-500 font-bold">₦3,000</strong> commission on sign-up. They get <strong className="text-orange-500 font-bold">₦2,000</strong> welcome bonus instantly!
             </p>
           </div>
         </div>
@@ -238,7 +238,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Referral Link</span>
               <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[150px] sm:max-w-[180px] block">
-                velorapay.com/?ref={user.username.toLowerCase()}
+                volerapay.com/?ref={user.username.toLowerCase()}
               </span>
             </div>
             <button

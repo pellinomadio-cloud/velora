@@ -339,7 +339,7 @@ const RAW_EARN_COMPANIES: EarnCompany[] = [
   // 5. Tech & Digital (10 companies)
   {
     id: 'co-41',
-    name: 'Velora eSim Network Towers',
+    name: 'Volerapay eSim Network Towers',
     sector: 'Tech & Digital',
     dailyEarning: 11200,
     description: 'Active digital telecom bandwidth leasing and profile queries.',

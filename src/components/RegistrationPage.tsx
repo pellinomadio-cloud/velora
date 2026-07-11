@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Mail, User as UserIcon, Lock, CheckCircle2, ArrowRight, Gift, KeyRound } from 'lucide-react';
+import { Mail, User as UserIcon, Lock, CheckCircle2, ArrowRight, Gift, KeyRound, Copy, Check, ExternalLink, ShieldAlert } from 'lucide-react';
 import { User, Transaction } from '../types';
 import { 
   syncUserToFirebase, 
@@ -40,9 +40,22 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
   const [pendingUsername, setPendingUsername] = useState('');
   const [pendingPin, setPendingPin] = useState('');
   const [pendingReferralCode, setPendingReferralCode] = useState('');
+  const [isDomainError, setIsDomainError] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyDomain = () => {
+    try {
+      navigator.clipboard.writeText(window.location.hostname);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Failed to copy domain', e);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setIsDomainError(false);
     setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -88,7 +101,11 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
       }
     } catch (err: any) {
       console.error('Google Sign-In failed:', err);
-      setError(err.message || 'Google Sign-In failed. Please try again.');
+      if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('auth/unauthorized-domain') || err?.message?.includes('unauthorized-domain')) {
+        setIsDomainError(true);
+      } else {
+        setError(err.message || 'Google Sign-In failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -431,6 +448,96 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
     }
   };
 
+  if (isDomainError) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-300">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-orange-400/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-zinc-800/10 dark:bg-orange-600/5 blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/50 rounded-3xl shadow-xl overflow-hidden p-6 sm:p-8 relative transition-all duration-300">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-500/10 text-orange-500 mb-3">
+              <ShieldAlert className="w-8 h-8 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Authorize App Domain</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Firebase requires authorization to allow Google Account Registration</p>
+          </div>
+
+          <div className="space-y-4 text-xs text-zinc-600 dark:text-zinc-300">
+            <p className="leading-relaxed">
+              Google Registration failed because this application's domain is not yet allowlisted in your Firebase project. To enable it, follow these steps:
+            </p>
+
+            <ol className="list-decimal pl-4 space-y-2.5 font-medium">
+              <li>
+                Open the{' '}
+                <a 
+                  href="https://console.firebase.google.com/project/velora-a969e/authentication/settings" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-orange-500 hover:underline inline-flex items-center gap-0.5 font-semibold"
+                >
+                  Firebase Console Settings <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+              <li>
+                Click on the <strong className="text-zinc-900 dark:text-white">Authorized domains</strong> option under settings.
+              </li>
+              <li>
+                Click the <strong className="text-zinc-900 dark:text-white">Add domain</strong> button.
+              </li>
+              <li>
+                Paste this domain and click <strong className="text-zinc-950 dark:text-white">Add</strong>:
+              </li>
+            </ol>
+
+            <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-2xl flex items-center justify-between font-mono text-zinc-800 dark:text-zinc-200 text-xs shadow-inner">
+              <span className="truncate pr-2">{window.location.hostname}</span>
+              <button
+                type="button"
+                onClick={handleCopyDomain}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white rounded-xl text-[10px] font-bold transition-all shadow-sm active:scale-95 cursor-pointer flex-shrink-0"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-300" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <p className="leading-relaxed bg-orange-500/5 border border-orange-500/10 rounded-2xl p-3 text-[11px] text-orange-600 dark:text-orange-400 font-medium">
+              💡 <span className="font-bold">Note:</span> If you are using a custom Firebase project instead of <strong className="font-extrabold text-zinc-900 dark:text-white">velora-a969e</strong>, select your corresponding project first in the console, then go to Authentication &rarr; Settings &rarr; Authorized Domains.
+            </p>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-zinc-800/60 flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="flex-1 py-3 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white font-semibold rounded-2xl text-xs transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
+            >
+              Try Registration Again
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDomainError(false)}
+              className="px-4 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold rounded-2xl text-xs transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (googlePendingUser) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-300">
@@ -443,7 +550,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
               <div className="w-10 h-10 rounded-2xl bg-orange-500 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-orange-500/20">
                 V
               </div>
-              <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Velora</span>
+              <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Volerapay</span>
             </div>
             <h3 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">Complete Google Wallet Setup</h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Configure your borderless digital wallet credentials</p>
@@ -546,7 +653,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
             <div className="w-9 h-9 rounded-2xl bg-orange-500 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-orange-500/20">
               V
             </div>
-            <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Velora</span>
+            <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Volerapay</span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Create your borderless multi-currency wallet in seconds</p>
         </div>
@@ -678,7 +785,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
               <Gift className="w-4 h-4" />
             </div>
             <p className="text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-400 leading-tight">
-              <strong className="text-orange-500 dark:text-orange-400 font-semibold">Velora Partner Rewards:</strong> Input a friend's referral code to unlock ₦2,000 instant welcome bonus! Your friend gets ₦3,000 commission.
+              <strong className="text-orange-500 dark:text-orange-400 font-semibold">Volerapay Partner Rewards:</strong> Input a friend's referral code to unlock ₦2,000 instant welcome bonus! Your friend gets ₦3,000 commission.
             </p>
           </div>
 

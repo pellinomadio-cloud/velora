@@ -27,33 +27,33 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
   const [adminSection, setAdminSection] = useState<'kyc' | 'cards' | 'settings'>('kyc');
 
   // Company Account Settings State
-  const [companyBankName, setCompanyBankName] = useState('Wema Bank (Velora Digital)');
+  const [companyBankName, setCompanyBankName] = useState('Wema Bank (Volerapay Digital)');
   const [companyAccountNum, setCompanyAccountNum] = useState('0123958373');
-  const [companyAccountName, setCompanyAccountName] = useState('Velora Fintech Solutions');
+  const [companyAccountName, setCompanyAccountName] = useState('Volerapay Fintech Solutions');
   const [companyFee, setCompanyFee] = useState(7500);
-  const [companySupportLink, setCompanySupportLink] = useState('https://t.me/VeloraSupportDesk');
+  const [companySupportLink, setCompanySupportLink] = useState('https://t.me/VolerapaySupportDesk');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     // Try to load from Firestore first
     getSystemConfigFromFirebase().then((fbConfig) => {
       if (fbConfig) {
-        setCompanyBankName(fbConfig.bankName || 'Wema Bank (Velora Digital)');
+        setCompanyBankName(fbConfig.bankName || 'Wema Bank (Volerapay Digital)');
         setCompanyAccountNum(fbConfig.accountNumber || '0123958373');
-        setCompanyAccountName(fbConfig.accountName || 'Velora Fintech Solutions');
+        setCompanyAccountName(fbConfig.accountName || 'Volerapay Fintech Solutions');
         setCompanyFee(fbConfig.fee || 7500);
-        setCompanySupportLink(fbConfig.supportLink || 'https://t.me/VeloraSupportDesk');
+        setCompanySupportLink(fbConfig.supportLink || 'https://t.me/VolerapaySupportDesk');
       } else {
         // Fallback to localStorage
         const saved = localStorage.getItem('velora_company_account');
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
-            setCompanyBankName(parsed.bankName || 'Wema Bank (Velora Digital)');
+            setCompanyBankName(parsed.bankName || 'Wema Bank (Volerapay Digital)');
             setCompanyAccountNum(parsed.accountNumber || '0123958373');
-            setCompanyAccountName(parsed.accountName || 'Velora Fintech Solutions');
+            setCompanyAccountName(parsed.accountName || 'Volerapay Fintech Solutions');
             setCompanyFee(parsed.fee || 7500);
-            setCompanySupportLink(parsed.supportLink || 'https://t.me/VeloraSupportDesk');
+            setCompanySupportLink(parsed.supportLink || 'https://t.me/VolerapaySupportDesk');
           } catch (e) {}
         }
       }

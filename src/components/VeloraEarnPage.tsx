@@ -95,7 +95,7 @@ export default function VeloraEarnPage({
           <div>
             <h1 className="text-base font-extrabold text-zinc-800 dark:text-white flex items-center gap-1.5">
               <Briefcase className="w-4 h-4 text-orange-500" />
-              Velora Earn
+              Volerapay Earn
             </h1>
             <p className="text-[10px] text-zinc-400">Stream high-yield revenue passively</p>
           </div>

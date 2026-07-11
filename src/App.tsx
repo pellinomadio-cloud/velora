@@ -117,12 +117,12 @@ export default function App() {
               </div>
               
               <div className="space-y-2">
-                <h2 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">Velora Account Suspended</h2>
+                <h2 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">Volerapay Account Suspended</h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
                   Your account (<strong className="font-extrabold">{currentUser.email}</strong>) has been restricted and suspended by central security compliance administrators for outstanding fees or terms violation.
                 </p>
                 <p className="text-[11px] text-red-500 font-bold bg-red-50 dark:bg-red-950/10 p-3.5 rounded-2xl border border-red-100 dark:border-red-950/25 leading-relaxed">
-                  To appeal or resolve compliance locks, please contact our compliance desk at <strong className="underline">support@velora.com</strong>.
+                  To appeal or resolve compliance locks, please contact our compliance desk at <strong className="underline">support@volerapay.com</strong>.
                 </p>
               </div>
 

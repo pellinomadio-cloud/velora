@@ -44,7 +44,7 @@ export default function ESimTab({ user }: ESimTabProps) {
           </span>
 
           <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight leading-tight">
-            Velora Borderless eSIM
+            Volerapay Borderless eSIM
           </h2>
           
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2.5 leading-relaxed">

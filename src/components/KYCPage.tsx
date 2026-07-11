@@ -37,9 +37,9 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
       }
     }
     return {
-      bankName: 'Wema Bank (Velora Digital)',
+      bankName: 'Wema Bank (Volerapay Digital)',
       accountNumber: '0123958373',
-      accountName: 'Velora Fintech Solutions',
+      accountName: 'Volerapay Fintech Solutions',
       fee: 7500,
     };
   });
@@ -49,9 +49,9 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
     getSystemConfigFromFirebase().then((fbConfig) => {
       if (fbConfig) {
         setAccountDetails({
-          bankName: fbConfig.bankName || 'Wema Bank (Velora Digital)',
+          bankName: fbConfig.bankName || 'Wema Bank (Volerapay Digital)',
           accountNumber: fbConfig.accountNumber || '0123958373',
-          accountName: fbConfig.accountName || 'Velora Fintech Solutions',
+          accountName: fbConfig.accountName || 'Volerapay Fintech Solutions',
           fee: fbConfig.fee || 7500,
         });
       }

@@ -297,7 +297,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   minute: '2-digit',
                 }),
                 status: 'completed',
-                recipient: 'Velora Wallet',
+                recipient: 'Volerapay Wallet',
                 reference: `OFF-${Math.floor(100000 + Math.random() * 900000)}`
               };
 
@@ -717,7 +717,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
       id: `TX-${Math.floor(100000 + Math.random() * 900000)}`,
       type: 'bills',
       title: `${billType} Utility Settled`,
-      subtitle: 'Paid securely via Velora biller network',
+      subtitle: 'Paid securely via Volerapay biller network',
       amount: amt,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       status: 'completed'
@@ -983,7 +983,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                     {/* Action 3: Support */}
                     <button
                       onClick={() => {
-                        let link = 'https://t.me/VeloraSupportDesk';
+                        let link = 'https://t.me/VolerapaySupportDesk';
                         const saved = localStorage.getItem('velora_company_account');
                         if (saved) {
                           try {
@@ -1014,15 +1014,15 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                       <div className="w-11 h-11 rounded-full bg-white/10 dark:bg-zinc-800/80 group-hover:bg-orange-500/20 group-hover:text-orange-400 flex items-center justify-center text-white transition-all">
                         <Briefcase className="w-4 h-4 text-orange-400" />
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Velora Earn</span>
+                      <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Volerapay Earn</span>
                     </button>
                   </div>
                 </div>
 
-                {/* 2. VELORA REVENUE CONVERTER SECTION */}
+                {/* 2. VOLERAPAY REVENUE CONVERTER SECTION */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-zinc-800 dark:text-white">Velora Revenue</h2>
+                    <h2 className="text-sm font-bold text-zinc-800 dark:text-white">Volerapay Revenue</h2>
                     <button
                       onClick={() => setActiveModal('trade')}
                       className="text-xs font-bold text-orange-500 hover:underline bg-transparent border-none cursor-pointer"
@@ -1036,7 +1036,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                     <div>
                       <p className="text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">
                         {user.kycStatus === 'verified'
-                          ? 'USDT to Velora Revenue Conversion!'
+                          ? 'USDT to Volerapay Revenue Conversion!'
                           : user.kycStatus === 'pending'
                             ? 'KYC Verification Pending Approval'
                             : 'Complete KYC to unlock Revenue!'}
@@ -1144,7 +1144,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                       <h4 className="text-xs font-black tracking-wider text-zinc-800 dark:text-white uppercase">Live Payouts Feed</h4>
                     </div>
                     <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest bg-slate-100 dark:bg-zinc-900 px-2.5 py-1 rounded-full">
-                      Velora Instant
+                      Volerapay Instant
                     </span>
                   </div>
 
@@ -1368,7 +1368,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
               <div className="space-y-3 max-h-[160px] overflow-y-auto no-scrollbar">
                 <div className="p-2.5 bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100/35 dark:border-orange-950/20 rounded-xl">
-                  <p className="text-xs font-bold text-zinc-800 dark:text-white">Velora pre-funded gift! 🎁</p>
+                  <p className="text-xs font-bold text-zinc-800 dark:text-white">Volerapay pre-funded gift! 🎁</p>
                   <p className="text-[10px] text-zinc-500 mt-0.5">We pre-funded your registration with ₦150,000 for realistic trial trades.</p>
                 </div>
                 <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl">
@@ -1391,7 +1391,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
             >
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-850 pb-2">
                 <h3 className="text-sm font-black text-zinc-800 dark:text-white flex items-center gap-1.5">
-                  <Headphones className="w-4 h-4 text-orange-500" /> Velora Live Helpdesk
+                  <Headphones className="w-4 h-4 text-orange-500" /> Volerapay Live Helpdesk
                 </h3>
                 <button
                   onClick={() => setShowHelp(false)}
@@ -1403,10 +1403,10 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
               <div className="space-y-3">
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Welcome to Velora help services. Need support? Ask our agents about transfers, virtual debit cards, or roaming eSIM profiles.
+                  Welcome to Volerapay help services. Need support? Ask our agents about transfers, virtual debit cards, or roaming eSIM profiles.
                 </p>
                 <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-2xl border border-slate-100 dark:border-zinc-850 text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
-                  ⚡ 24/7 Priority support at: <span className="font-bold text-orange-500">support@velora.com</span>
+                  ⚡ 24/7 Priority support at: <span className="font-bold text-orange-500">support@volerapay.com</span>
                 </div>
               </div>
             </motion.div>
@@ -1428,7 +1428,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-zinc-800 pb-3">
                   <div>
                     <h3 className="text-base font-extrabold text-zinc-800 dark:text-white capitalize">
-                      {activeModal === 'earn' ? 'Velora Earn Pools' : activeModal === 'withdraw' ? 'Secure Bank Withdrawal' : activeModal === 'transactions' ? 'Transaction History' : activeModal.replace('_', ' ')}
+                      {activeModal === 'earn' ? 'Volerapay Earn Pools' : activeModal === 'withdraw' ? 'Secure Bank Withdrawal' : activeModal === 'transactions' ? 'Transaction History' : activeModal.replace('_', ' ')}
                     </h3>
                     <p className="text-[10px] text-zinc-400">
                       {activeModal === 'transactions' ? 'Complete archive of your ledger activity' : 'Complete transaction securely'}

@@ -74,9 +74,9 @@ export default function CardTab({
   const [submittingError, setSubmittingError] = useState('');
 
   const companyAccount = {
-    bankName: 'Wema Bank (Velora Digital)',
+    bankName: 'Wema Bank (Volerapay Digital)',
     accountNumber: '0123958373',
-    accountName: 'Velora Fintech Solutions',
+    accountName: 'Volerapay Fintech Solutions',
     fee: 11000,
   };
 
@@ -308,7 +308,7 @@ export default function CardTab({
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] uppercase tracking-widest font-extrabold opacity-60">
-                      Velora Virtual Card
+                      Volerapay Virtual Card
                     </span>
                     <p className="text-xl font-bold tracking-wide mt-1">
                       ₦{currentCard.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -542,7 +542,7 @@ export default function CardTab({
                   {/* Load Card funds section */}
                   <div className="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800/60 shadow-sm">
                     <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Load Card Balance</h3>
-                    <p className="text-[11px] text-zinc-400 mt-1 mb-4">Transfer money from your primary Velora wallet to this virtual card instantly.</p>
+                    <p className="text-[11px] text-zinc-400 mt-1 mb-4">Transfer money from your primary Volerapay wallet to this virtual card instantly.</p>
 
                     {loadError && (
                       <div className="p-3 mb-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
@@ -631,7 +631,7 @@ export default function CardTab({
                     onChange={(e) => setNewCardColor(e.target.value)}
                     className="w-full px-3 py-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs font-bold focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white"
                   >
-                    <option value="from-orange-500 to-amber-600">Velora Orange</option>
+                    <option value="from-orange-500 to-amber-600">Volerapay Orange</option>
                     <option value="from-indigo-600 to-purple-700">Digital Purple</option>
                     <option value="from-zinc-800 to-zinc-950">Metal Stealth Black</option>
                     <option value="from-emerald-500 to-teal-700">Emerald Jade</option>
@@ -643,7 +643,7 @@ export default function CardTab({
               {/* Preview Box */}
               <div className={`w-full h-36 bg-gradient-to-br ${newCardColor} rounded-2xl p-4 text-white flex flex-col justify-between border border-white/5 opacity-90`}>
                 <div className="flex justify-between items-start">
-                  <span className="text-[9px] uppercase tracking-widest opacity-60">Velora Virtual</span>
+                  <span className="text-[9px] uppercase tracking-widest opacity-60">Volerapay Virtual</span>
                   <span className="text-[10px] font-black uppercase italic">{newCardType}</span>
                 </div>
                 <p className="text-sm font-mono tracking-widest text-center my-1">•••• •••• •••• 1289</p>
