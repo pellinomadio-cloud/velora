@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, ArrowRight, KeyRound } from 'lucide-react';
 import { User } from '../types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { syncUserToFirebase } from '../firebaseSync';
 
 interface LoginPageProps {
   onLoginComplete: (user: User) => void;
@@ -13,7 +16,7 @@ export default function LoginPage({ onLoginComplete, onNavigateToRegister }: Log
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -22,9 +25,40 @@ export default function LoginPage({ onLoginComplete, onNavigateToRegister }: Log
       return;
     }
 
+    const trimmedEmail = email.toLowerCase().trim();
+
+    try {
+      // 1. Try to fetch user from Firebase
+      const userRef = doc(db, 'users', trimmedEmail);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const firebaseUser = snap.data() as User;
+        if (firebaseUser.pin === pin) {
+          // Success! Save to local storage & login
+          const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+          const idx = accounts.findIndex((a: User) => a.email.toLowerCase() === trimmedEmail);
+          if (idx !== -1) {
+            accounts[idx] = firebaseUser;
+          } else {
+            accounts.push(firebaseUser);
+          }
+          localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+          localStorage.setItem('velora_current_user', JSON.stringify(firebaseUser));
+          onLoginComplete(firebaseUser);
+          return;
+        } else {
+          setError('Invalid email or 6-digit PIN code. Please try again.');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Firebase login check failed, falling back to local database:', err);
+    }
+
+    // 2. Fallback to LocalStorage
     const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
     const matchedUser = accounts.find(
-      (acc: User) => acc.email.toLowerCase() === email.toLowerCase().trim() && acc.pin === pin
+      (acc: User) => acc.email.toLowerCase() === trimmedEmail && acc.pin === pin
     );
 
     if (!matchedUser) {
@@ -33,6 +67,10 @@ export default function LoginPage({ onLoginComplete, onNavigateToRegister }: Log
     }
 
     localStorage.setItem('velora_current_user', JSON.stringify(matchedUser));
+    
+    // Attempt async sync to firebase since they logged in locally
+    syncUserToFirebase(matchedUser).catch(err => console.error('Failed to sync on local login:', err));
+    
     onLoginComplete(matchedUser);
   };
 

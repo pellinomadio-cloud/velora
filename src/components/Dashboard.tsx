@@ -37,6 +37,16 @@ import {
 } from 'lucide-react';
 import { User, Transaction, ESimPlan } from '../types';
 import { EARN_COMPANIES, EarnCompany } from '../data/companies';
+import {
+  syncUserToFirebase,
+  syncTransactionToFirebase,
+  syncJoinedCompanyToFirebase,
+  getUserTransactionsFromFirebase,
+  getUserJoinedCompaniesFromFirebase,
+  getSystemConfigFromFirebase
+} from '../firebaseSync';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 // Import Tabs
 import ESimTab from './ESimTab';
@@ -354,14 +364,72 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     return () => clearInterval(interval);
   }, [joinedCompanies, user.email, user.kycStatus]);
 
-  // Load and save accounts/transactions locally
+  // Listen to real-time changes of the user profile on Firestore
   useEffect(() => {
+    if (!user || !user.email) return;
+    const userRef = doc(db, 'users', user.email.toLowerCase());
+    
+    const unsubscribe = onSnapshot(userRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as User;
+        // Check if any of the critical fields changed
+        if (
+          data.balance !== user.balance ||
+          data.kycStatus !== user.kycStatus ||
+          data.kycPlan !== user.kycPlan ||
+          data.cardActivationStatus !== user.cardActivationStatus ||
+          data.isBanned !== user.isBanned ||
+          data.username !== user.username ||
+          data.avatarUrl !== user.avatarUrl
+        ) {
+          setUser(data);
+          localStorage.setItem('velora_current_user', JSON.stringify(data));
+          
+          // Update in local accounts list as well
+          const accounts = JSON.parse(localStorage.getItem('velora_accounts') || '[]');
+          const idx = accounts.findIndex((a: any) => a.email.toLowerCase() === user.email.toLowerCase());
+          if (idx !== -1) {
+            accounts[idx] = data;
+            localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+          }
+          
+          if (onUpdateUser) {
+            onUpdateUser(data);
+          }
+        }
+      }
+    }, (err) => {
+      console.warn('Real-time listener failed, using offline states:', err);
+    });
+
+    return () => unsubscribe();
+  }, [user.email]);
+
+  // Load and save accounts/transactions locally and from Firestore
+  useEffect(() => {
+    // Local fallback
     const savedTxs = localStorage.getItem(`velora_txs_${user.email}`);
     if (savedTxs) {
       setTransactions(JSON.parse(savedTxs));
     } else {
       setTransactions([]);
     }
+
+    // Pull transactions and joined companies from Firestore
+    getUserTransactionsFromFirebase(user.email).then((fbTxs) => {
+      if (fbTxs.length > 0) {
+        setTransactions(fbTxs);
+        localStorage.setItem(`velora_txs_${user.email}`, JSON.stringify(fbTxs));
+      }
+    }).catch(err => console.warn('Failed to load transactions from Firebase:', err));
+
+    getUserJoinedCompaniesFromFirebase(user.email).then((fbJcs) => {
+      if (fbJcs.length > 0) {
+        setJoinedCompanies(fbJcs);
+        localStorage.setItem(`velora_joined_companies_${user.email}`, JSON.stringify(fbJcs));
+      }
+    }).catch(err => console.warn('Failed to load joined companies from Firebase:', err));
+
   }, [user.email]);
 
   const updateGlobalUser = (updated: User) => {
@@ -379,12 +447,18 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     if (onUpdateUser) {
       onUpdateUser(updated);
     }
+
+    // Sync to Firebase
+    syncUserToFirebase(updated).catch(err => console.error('Failed to sync updated user:', err));
   };
 
   const addTransaction = (newTx: Transaction) => {
     const updated = [newTx, ...transactions];
     setTransactions(updated);
     localStorage.setItem(`velora_txs_${user.email}`, JSON.stringify(updated));
+
+    // Sync to Firebase
+    syncTransactionToFirebase(user.email, newTx).catch(err => console.error('Failed to sync transaction to Firebase:', err));
   };
 
   // 1. Add Money Handler
@@ -512,6 +586,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     const updatedJoined = [...joinedCompanies, newJoin];
     setJoinedCompanies(updatedJoined);
     localStorage.setItem(`velora_joined_companies_${user.email}`, JSON.stringify(updatedJoined));
+
+    // Sync joined company to Firebase
+    syncJoinedCompanyToFirebase(user.email, newJoin).catch(err => console.error('Failed to sync joined company to Firebase:', err));
 
     const newCount = currentCount + 1;
     setJoinedTodayCount(newCount);

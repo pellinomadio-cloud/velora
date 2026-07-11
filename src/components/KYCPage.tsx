@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Copy, Check, Upload, ShieldAlert, CheckCircle2, FileImage, CreditCard } from 'lucide-react';
 import { User } from '../types';
+import { getSystemConfigFromFirebase } from '../firebaseSync';
 
 interface KYCPageProps {
   user: User;
@@ -42,6 +43,20 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
       fee: 7500,
     };
   });
+
+  // Load from Firestore on mount
+  useEffect(() => {
+    getSystemConfigFromFirebase().then((fbConfig) => {
+      if (fbConfig) {
+        setAccountDetails({
+          bankName: fbConfig.bankName || 'Wema Bank (Velora Digital)',
+          accountNumber: fbConfig.accountNumber || '0123958373',
+          accountName: fbConfig.accountName || 'Velora Fintech Solutions',
+          fee: fbConfig.fee || 7500,
+        });
+      }
+    }).catch(err => console.warn('Failed to load system config from Firebase:', err));
+  }, []);
 
   // Dynamic plan fee calculation based on user balance and selected plan
   const getDynamicPlanFee = (planId: 'two_key' | 'three_key' | 'unlimited') => {

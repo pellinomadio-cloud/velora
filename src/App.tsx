@@ -3,6 +3,7 @@ import { User } from './types';
 import RegistrationPage from './components/RegistrationPage';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
+import { syncUserToFirebase, seedUsersToFirebase } from './firebaseSync';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -24,8 +25,9 @@ export default function App() {
     }
 
     // 2. Default Accounts seeding
-    const accounts = localStorage.getItem('velora_accounts');
-    if (!accounts) {
+    const accountsStr = localStorage.getItem('velora_accounts');
+    let accounts: User[] = [];
+    if (!accountsStr) {
       // Seed a default demo account so the app starts with content immediately!
       const demoAccount: User = {
         username: 'marvelous olatunji',
@@ -37,7 +39,19 @@ export default function App() {
         joinedAt: 'July 2026',
         darkMode: false,
       };
-      localStorage.setItem('velora_accounts', JSON.stringify([demoAccount]));
+      accounts = [demoAccount];
+      localStorage.setItem('velora_accounts', JSON.stringify(accounts));
+    } else {
+      try {
+        accounts = JSON.parse(accountsStr);
+      } catch (e) {
+        console.error('Failed to parse accounts:', e);
+      }
+    }
+
+    // Seed/Sync existing local accounts to Firestore in background
+    if (accounts.length > 0) {
+      seedUsersToFirebase(accounts).catch(err => console.error('Seeding users to firebase failed:', err));
     }
   }, []);
 
@@ -78,6 +92,9 @@ export default function App() {
       accounts[index] = updatedUser;
       localStorage.setItem('velora_accounts', JSON.stringify(accounts));
     }
+
+    // Sync to Firebase
+    syncUserToFirebase(updatedUser).catch(err => console.error('Failed to sync updated user:', err));
   };
 
   const handleToggleDarkMode = () => {

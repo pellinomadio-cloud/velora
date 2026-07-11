@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Lock, Users, ShieldCheck, ShieldAlert, Eye, X, Check, Search, Trash2, RotateCcw } from 'lucide-react';
 import { User } from '../types';
+import {
+  getAllUsersFromFirebase,
+  syncUserToFirebase,
+  getSystemConfigFromFirebase,
+  updateSystemConfigInFirebase
+} from '../firebaseSync';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -29,17 +35,31 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('velora_company_account');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setCompanyBankName(parsed.bankName || 'Wema Bank (Velora Digital)');
-        setCompanyAccountNum(parsed.accountNumber || '0123958373');
-        setCompanyAccountName(parsed.accountName || 'Velora Fintech Solutions');
-        setCompanyFee(parsed.fee || 7500);
-        setCompanySupportLink(parsed.supportLink || 'https://t.me/VeloraSupportDesk');
-      } catch (e) {}
-    }
+    // Try to load from Firestore first
+    getSystemConfigFromFirebase().then((fbConfig) => {
+      if (fbConfig) {
+        setCompanyBankName(fbConfig.bankName || 'Wema Bank (Velora Digital)');
+        setCompanyAccountNum(fbConfig.accountNumber || '0123958373');
+        setCompanyAccountName(fbConfig.accountName || 'Velora Fintech Solutions');
+        setCompanyFee(fbConfig.fee || 7500);
+        setCompanySupportLink(fbConfig.supportLink || 'https://t.me/VeloraSupportDesk');
+      } else {
+        // Fallback to localStorage
+        const saved = localStorage.getItem('velora_company_account');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setCompanyBankName(parsed.bankName || 'Wema Bank (Velora Digital)');
+            setCompanyAccountNum(parsed.accountNumber || '0123958373');
+            setCompanyAccountName(parsed.accountName || 'Velora Fintech Solutions');
+            setCompanyFee(parsed.fee || 7500);
+            setCompanySupportLink(parsed.supportLink || 'https://t.me/VeloraSupportDesk');
+          } catch (e) {}
+        }
+      }
+    }).catch((err) => {
+      console.warn('Failed to load system config from Firebase:', err);
+    });
   }, []);
 
   const handleSaveCompanyDetails = () => {
@@ -51,8 +71,14 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
       supportLink: companySupportLink,
     };
     localStorage.setItem('velora_company_account', JSON.stringify(data));
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    
+    // Sync to Firestore
+    updateSystemConfigInFirebase(data)
+      .then(() => {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      })
+      .catch((err) => console.error('Failed to save company settings to Firebase:', err));
   };
 
   // Selected receipt visualizer modal
@@ -62,14 +88,34 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
 
   // Load account records
   const loadUsers = () => {
-    const saved = localStorage.getItem('velora_accounts');
-    if (saved) {
-      try {
-        setUsersList(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to parse users list', e);
+    // 1. Try Firestore
+    getAllUsersFromFirebase().then((fbUsers) => {
+      if (fbUsers && fbUsers.length > 0) {
+        setUsersList(fbUsers);
+        // Sync local storage list for robustness
+        localStorage.setItem('velora_accounts', JSON.stringify(fbUsers));
+      } else {
+        // 2. Fallback to local storage
+        const saved = localStorage.getItem('velora_accounts');
+        if (saved) {
+          try {
+            setUsersList(JSON.parse(saved));
+          } catch (e) {
+            console.error('Failed to parse users list', e);
+          }
+        }
       }
-    }
+    }).catch((err) => {
+      console.warn('Failed to fetch users from Firebase, loading offline list:', err);
+      const saved = localStorage.getItem('velora_accounts');
+      if (saved) {
+        try {
+          setUsersList(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to parse users list', e);
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -89,9 +135,12 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
 
   // KYC Status Modifiers
   const handleApproveKyc = (userEmail: string) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, kycStatus: 'verified' as const };
+        const u = { ...usr, kycStatus: 'verified' as const };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -110,13 +159,22 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         }
       } catch (err) {}
     }
+    
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync KYC approval:', err));
+    }
+    
     onRefreshUser();
   };
 
   const handleRejectKyc = (userEmail: string) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, kycStatus: 'unverified' as const, kycPaymentProof: undefined };
+        const u = { ...usr, kycStatus: 'unverified' as const, kycPaymentProof: '' };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -131,19 +189,28 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         const parsed: User = JSON.parse(curr);
         if (parsed.email.toLowerCase() === userEmail.toLowerCase()) {
           parsed.kycStatus = 'unverified';
-          parsed.kycPaymentProof = undefined;
+          parsed.kycPaymentProof = '';
           localStorage.setItem('velora_current_user', JSON.stringify(parsed));
         }
       } catch (err) {}
     }
+
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync KYC rejection:', err));
+    }
+
     onRefreshUser();
   };
 
   // Card Activation Modifiers
   const handleApproveCard = (userEmail: string) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, cardActivationStatus: 'verified' as const };
+        const u = { ...usr, cardActivationStatus: 'verified' as const };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -162,13 +229,22 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         }
       } catch (err) {}
     }
+
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync card approval:', err));
+    }
+
     onRefreshUser();
   };
 
   const handleRejectCard = (userEmail: string) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, cardActivationStatus: 'unverified' as const, cardActivationProof: undefined };
+        const u = { ...usr, cardActivationStatus: 'unverified' as const, cardActivationProof: '' };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -183,19 +259,28 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         const parsed: User = JSON.parse(curr);
         if (parsed.email.toLowerCase() === userEmail.toLowerCase()) {
           parsed.cardActivationStatus = 'unverified';
-          parsed.cardActivationProof = undefined;
+          parsed.cardActivationProof = '';
           localStorage.setItem('velora_current_user', JSON.stringify(parsed));
         }
       } catch (err) {}
     }
+
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync card rejection:', err));
+    }
+
     onRefreshUser();
   };
 
   // Reset user balance (to help test ₦0.00 naira logic easily)
   const handleResetBalance = (userEmail: string) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, balance: 0.00 };
+        const u = { ...usr, balance: 0.00 };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -213,14 +298,23 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         }
       } catch (err) {}
     }
+
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync balance reset:', err));
+    }
+
     onRefreshUser();
   };
 
   // Ban or Unban user account
   const handleToggleBan = (userEmail: string, currentBannedState: boolean) => {
+    let targetUsr: User | null = null;
     const updated = usersList.map((usr) => {
       if (usr.email.toLowerCase() === userEmail.toLowerCase()) {
-        return { ...usr, isBanned: !currentBannedState };
+        const u = { ...usr, isBanned: !currentBannedState };
+        targetUsr = u;
+        return u;
       }
       return usr;
     });
@@ -239,6 +333,12 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
         }
       } catch (err) {}
     }
+
+    // Sync to Firestore
+    if (targetUsr) {
+      syncUserToFirebase(targetUsr).catch(err => console.error('Failed to sync toggle ban:', err));
+    }
+
     onRefreshUser();
   };
 

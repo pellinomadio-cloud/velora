@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, User as UserIcon, Lock, CheckCircle2, ArrowRight, ArrowLeft, KeyRound } from 'lucide-react';
 import { User } from '../types';
+import { syncUserToFirebase } from '../firebaseSync';
 
 interface RegistrationPageProps {
   onRegisterComplete: (user: User) => void;
@@ -102,6 +103,9 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
     accounts.push(newUser);
     localStorage.setItem('velora_accounts', JSON.stringify(accounts));
     localStorage.setItem('velora_current_user', JSON.stringify(newUser));
+
+    // Async sync to Firebase
+    syncUserToFirebase(newUser).catch(err => console.error('Firebase registration sync failed:', err));
 
     onRegisterComplete(newUser);
   };

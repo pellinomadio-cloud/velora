@@ -1,0 +1,191 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile containing authentication details, balance, KYC, and card activation states.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "The full name or display name of the user."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The email address of the user (primary identifier)."
+        },
+        "pin": {
+          "type": "string",
+          "pattern": "^[0-9]{6}$",
+          "description": "6-digit transaction authorization pin."
+        },
+        "balance": {
+          "type": "number",
+          "description": "Account balance in Nigerian Naira (₦)."
+        },
+        "hideBalance": {
+          "type": "boolean",
+          "description": "Whether the balance display is obscured in the UI."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Avatar character, emoji or base64 data string."
+        },
+        "joinedAt": {
+          "type": "string",
+          "description": "ISO date-time or formatted string when user registered."
+        },
+        "darkMode": {
+          "type": "boolean",
+          "description": "Visual preference for dark interface mode."
+        },
+        "kycStatus": {
+          "type": "string",
+          "enum": ["unverified", "pending", "verified"],
+          "description": "The verification status of the user."
+        },
+        "kycPlan": {
+          "type": "string",
+          "enum": ["two_key", "three_key", "unlimited"],
+          "description": "The selected KYC partner daily join plan."
+        },
+        "kycPaymentProof": {
+          "type": "string",
+          "maxLength": 500000,
+          "description": "Base64 encoded string of user's payment transfer slip."
+        },
+        "cardActivationStatus": {
+          "type": "string",
+          "enum": ["unverified", "pending", "verified"],
+          "description": "Virtual card activation approval status."
+        },
+        "cardActivationProof": {
+          "type": "string",
+          "maxLength": 500000,
+          "description": "Base64 encoded payment slip for card activation."
+        },
+        "isBanned": {
+          "type": "boolean",
+          "description": "Indicates if the user is suspended from system operations."
+        }
+      },
+      "required": ["username", "email", "pin", "balance", "joinedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial ledger transactions including deposits, transfers, and utility payments.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique transaction identification string."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["deposit", "send", "airtime", "data", "bills", "exchange"],
+          "description": "The category classification of transaction."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "The title or action name of the transaction."
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Additional transactional details or descriptions."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Naira amount of the transaction."
+        },
+        "date": {
+          "type": "string",
+          "description": "ISO timestamp of transaction."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "pending", "failed"],
+          "description": "The current processing status."
+        },
+        "recipient": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Optional details of recipient or target account."
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Bank transaction reference number."
+        }
+      },
+      "required": ["id", "type", "title", "amount", "date", "status"]
+    },
+    "JoinedCompany": {
+      "title": "Joined Revenue Pool",
+      "description": "A revenue sharing pool the user has partnered with.",
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "The target company partner unique ID."
+        },
+        "joinedAt": {
+          "type": "string",
+          "description": "ISO date-time when the user entered this pool."
+        }
+      },
+      "required": ["companyId", "joinedAt"]
+    },
+    "SystemConfig": {
+      "title": "System Configuration",
+      "description": "Global administration settings including banking information and support handles.",
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "pattern": "^[0-9]{10}$",
+          "description": "The company settlement bank account number."
+        },
+        "accountName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "The registered legal entity name of bank account."
+        },
+        "fee": {
+          "type": "number",
+          "description": "The base KYC registration and verification fee."
+        },
+        "supportLink": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Direct URL to support staff (e.g. Telegram link)."
+        }
+      },
+      "required": ["accountNumber", "accountName", "fee", "supportLink"]
+    }
+  },
+  "firestore": {
+    "users/{email}": {
+      "schema": "User",
+      "description": "User profile document keyed by lowercased email address."
+    },
+    "users/{email}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Chronological list of all financial actions completed by the user."
+    },
+    "users/{email}/joinedCompanies/{companyId}": {
+      "schema": "JoinedCompany",
+      "description": "Passive income revenue pools the user is currently subscribed to."
+    },
+    "system/config": {
+      "schema": "SystemConfig",
+      "description": "Global settings editable by administrators, visible to all authenticated users."
+    }
+  }
+}
