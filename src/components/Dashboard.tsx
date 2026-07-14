@@ -1032,36 +1032,47 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   </div>
 
                   {/* Trade prompt banner */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/70 to-pink-50/70 dark:from-zinc-950/40 dark:to-zinc-900/40 border border-orange-100/30 dark:border-zinc-800 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/70 to-pink-50/70 dark:from-zinc-950/40 dark:to-zinc-900/40 border border-orange-100/30 dark:border-zinc-800 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">
+                          {user.kycStatus === 'verified'
+                            ? 'USDT to Volerapay Revenue Conversion!'
+                            : user.kycStatus === 'pending'
+                              ? 'KYC Verification Pending Approval'
+                              : 'Complete KYC to unlock Revenue!'}
+                        </p>
+                        {(!user.kycStatus || user.kycStatus === 'unverified') && (
+                          <p className="text-[9px] text-zinc-400 mt-0.5">Activate account with ₦7,500 to unlock Revenue.</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (user.kycStatus === 'verified') {
+                            setDisplayCurrency((prev) => (prev === 'NGN' ? 'USD' : 'NGN'));
+                          } else {
+                            setModalError('');
+                            setActiveModal('trade');
+                          }
+                        }}
+                        className="px-4 py-2 bg-zinc-950 hover:bg-zinc-850 dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-[10px] font-black rounded-full transition-all cursor-pointer shadow-sm shrink-0"
+                      >
                         {user.kycStatus === 'verified'
-                          ? 'USDT to Volerapay Revenue Conversion!'
+                          ? 'Convert now'
                           : user.kycStatus === 'pending'
-                            ? 'KYC Verification Pending Approval'
-                            : 'Complete KYC to unlock Revenue!'}
-                      </p>
-                      {(!user.kycStatus || user.kycStatus === 'unverified') && (
-                        <p className="text-[9px] text-zinc-400 mt-0.5">Activate account with ₦7,500 to unlock Revenue.</p>
-                      )}
+                            ? 'Pending'
+                            : 'Unlock'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        if (user.kycStatus === 'verified') {
-                          setDisplayCurrency((prev) => (prev === 'NGN' ? 'USD' : 'NGN'));
-                        } else {
-                          setModalError('');
-                          setActiveModal('trade');
-                        }
-                      }}
-                      className="px-4 py-2 bg-zinc-950 hover:bg-zinc-850 dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-[10px] font-black rounded-full transition-all cursor-pointer shadow-sm shrink-0"
-                    >
-                      {user.kycStatus === 'verified'
-                        ? 'Convert now'
-                        : user.kycStatus === 'pending'
-                          ? 'Pending'
-                          : 'Unlock'}
-                    </button>
+
+                    {/* Perpetual Live Revenue Loading Bar */}
+                    <div className="flex items-center justify-between pt-2.5 text-[9px] text-zinc-400 dark:text-zinc-500 border-t border-zinc-200/50 dark:border-zinc-800/80">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <span className="w-2.5 h-2.5 border border-orange-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                        <span>Live revenue feeds syncing...</span>
+                      </div>
+                      <span className="animate-pulse text-orange-500 font-bold uppercase tracking-wider text-[8px]">Live streaming active</span>
+                    </div>
                   </div>
 
                   {/* Horizontal Rates List */}

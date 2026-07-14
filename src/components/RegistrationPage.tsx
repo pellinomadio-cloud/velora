@@ -35,6 +35,18 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        setReferralCode(ref.trim());
+      }
+    } catch (e) {
+      console.error('Error parsing URL referral code', e);
+    }
+  }, []);
+
   // Google Sign-In pending registration states
   const [googlePendingUser, setGooglePendingUser] = useState<{ email: string; displayName?: string } | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
@@ -326,8 +338,8 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
       // Check referral code validity if entered
       let referrerUser: User | null = null;
       if (cleanReferral) {
-        // Referral code is the referrer's username
-        referrerUser = allUsers.find(u => u.username.toLowerCase() === cleanReferral) || null;
+        // Referral code is the referrer's numeric referralCode or username
+        referrerUser = allUsers.find(u => (u.referralCode && u.referralCode.toLowerCase() === cleanReferral) || u.username.toLowerCase() === cleanReferral) || null;
         if (!referrerUser) {
           setError('Referral code not found. Please check or leave blank.');
           setIsLoading(false);
@@ -350,6 +362,12 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         newUserReferredBy = referrerUser.username;
       }
 
+      // Generate a unique 6-digit numeric referral code
+      let numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
+      while (allUsers.some(u => u.referralCode === numericReferralCode)) {
+        numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+
       const newUser: User = {
         username: cleanUsername,
         email: cleanEmail,
@@ -360,7 +378,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         darkMode: false,
         referredBy: newUserReferredBy,
-        referralCode: cleanUsername, // Their username serves as their referral code
+        referralCode: numericReferralCode, // Unique 6-digit numeric referral code
         referralCount: 0,
         referralEarnings: 0,
         kycStatus: 'unverified',
@@ -805,44 +823,6 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
                 Create Account & Claim Bonus <ArrowRight className="w-4 h-4" />
               </span>
             )}
-          </button>
-
-          <div className="relative my-4 flex items-center justify-center">
-            <div className="border-t border-slate-100 dark:border-zinc-800/80 w-full absolute" />
-            <span className="bg-white dark:bg-zinc-900 px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 relative z-10 uppercase tracking-wider">
-              Or Register With
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            className="w-full py-3 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-slate-200 dark:border-zinc-850 text-zinc-700 dark:text-zinc-300 font-semibold rounded-2xl text-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm hover:shadow-md"
-          >
-            {isLoading ? (
-              <span className="w-4 h-4 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-            ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.35 1 3.37 3.65 1.39 7.5l3.85 2.99C6.16 6.88 8.87 5.04 12 5.04z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.09 2.66-2.31 3.48l3.6 2.79c2.1-1.94 3.3-4.8 3.3-8.42z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.24 14.51c-.24-.72-.38-1.5-.38-2.31s.14-1.59.38-2.31L1.39 7.5C.5 9.3 0 11.1 0 13s.5 3.7 1.39 5.5l3.85-2.99z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c3.24 0 5.97-1.09 7.96-2.96l-3.6-2.79c-.99.66-2.26 1.07-3.6 1.07-3.13 0-5.84-1.84-6.76-4.51L1.39 16.8C3.37 20.35 7.35 23 12 23z"
-                />
-              </svg>
-            )}
-            <span>Google Account</span>
           </button>
 
           {/* Navigate to Login link */}

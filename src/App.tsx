@@ -4,6 +4,8 @@ import RegistrationPage from './components/RegistrationPage';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
 import { syncUserToFirebase, seedUsersToFirebase } from './firebaseSync';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -19,6 +21,23 @@ export default function App() {
         const parsed = JSON.parse(storedUser);
         setCurrentUser(parsed);
         setDarkMode(parsed.darkMode || false);
+
+        // Fetch latest version from Firestore to ensure balance and state are completely accurate on refresh!
+        const fetchLatestUser = async () => {
+          try {
+            const userRef = doc(db, 'users', parsed.email.toLowerCase().trim());
+            const snap = await getDoc(userRef);
+            if (snap.exists()) {
+              const latestUser = snap.data() as User;
+              setCurrentUser(latestUser);
+              setDarkMode(latestUser.darkMode || false);
+              localStorage.setItem('velora_current_user', JSON.stringify(latestUser));
+            }
+          } catch (e) {
+            console.error('Failed to auto-refresh user on mount:', e);
+          }
+        };
+        fetchLatestUser();
       } catch (err) {
         console.error('Failed to parse current user:', err);
       }

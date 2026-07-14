@@ -31,13 +31,15 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
 
   // Copy helpers
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(user.username.toLowerCase());
+    const displayCode = user.referralCode || user.username;
+    navigator.clipboard.writeText(displayCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyLink = () => {
-    const link = `https://volerapay.com/register?ref=${user.username.toLowerCase()}`;
+    const displayCode = user.referralCode || user.username;
+    const link = `${window.location.origin}/register?ref=${displayCode}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -48,7 +50,10 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
     setLoadingList(true);
     try {
       const allUsers = await getAllUsersFromFirebase();
-      const filtered = allUsers.filter(u => u.referredBy?.toLowerCase() === user.username.toLowerCase());
+      const filtered = allUsers.filter(u => 
+        u.referredBy?.toLowerCase() === user.username.toLowerCase() || 
+        (u.referredBy && user.referralCode && u.referredBy.toLowerCase() === user.referralCode.toLowerCase())
+      );
       setReferredUsers(filtered);
     } catch (err) {
       console.warn('Failed to fetch referrals list:', err);
@@ -59,7 +64,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
 
   useEffect(() => {
     loadReferredUsers();
-  }, [user.username]);
+  }, [user.username, user.referralCode]);
 
   // Handle Invitation Simulation
   const handleSimulateInvitation = async (e: React.FormEvent) => {
@@ -219,7 +224,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
           <div className="p-4 bg-slate-50/50 dark:bg-zinc-950/40 rounded-2xl border border-slate-100 dark:border-zinc-850 flex items-center justify-between">
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Your Referral Code</span>
-              <span className="text-sm font-extrabold text-zinc-800 dark:text-white font-mono lowercase tracking-wide">{user.username.toLowerCase()}</span>
+              <span className="text-sm font-extrabold text-zinc-800 dark:text-white font-mono tracking-wide">{user.referralCode || user.username}</span>
             </div>
             <button
               onClick={handleCopyCode}
@@ -238,7 +243,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Referral Link</span>
               <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[150px] sm:max-w-[180px] block">
-                volerapay.com/?ref={user.username.toLowerCase()}
+                {window.location.origin}/register?ref={user.referralCode || user.username}
               </span>
             </div>
             <button
@@ -300,87 +305,11 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
 
       </div>
 
-      {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Main Layout Area - Referred Partners list is full width */}
+      <div className="space-y-6">
         
-        {/* Simulation Invitation Form */}
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-3xl shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-zinc-850">
-            <Sparkles className="w-4 h-4 text-orange-500" />
-            <h3 className="text-sm font-bold text-zinc-800 dark:text-white">Simulate Partner Registration</h3>
-          </div>
-          
-          <p className="text-[11px] text-zinc-400 leading-relaxed">
-            Test the referral loops on-screen! Enter details for a simulated friend registering with your code. Both wallets will update and fund in real-time.
-          </p>
-
-          <form onSubmit={handleSimulateInvitation} className="space-y-3">
-            {simError && (
-              <div className="p-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-[10px] rounded-xl border border-red-100 dark:border-red-950/50">
-                {simError}
-              </div>
-            )}
-
-            {simSuccess && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-[10px] rounded-xl border border-emerald-100 dark:border-emerald-950/50 leading-relaxed">
-                {simSuccess}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5">
-              
-              {/* Username */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">Username</label>
-                <input
-                  type="text"
-                  placeholder="e.g. olawale"
-                  value={simName}
-                  onChange={(e) => setSimName(e.target.value.replace(/\s+/g, ''))}
-                  disabled={isSimulating}
-                  required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-xl text-xs focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">Email Address</label>
-                <input
-                  type="email"
-                  placeholder="e.g. friend@mail.com"
-                  value={simEmail}
-                  onChange={(e) => setSimEmail(e.target.value)}
-                  disabled={isSimulating}
-                  required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 rounded-xl text-xs focus:outline-none focus:border-orange-500 text-zinc-800 dark:text-white transition-all"
-                />
-              </div>
-
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSimulating}
-              className="w-full py-2.5 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 disabled:bg-zinc-400 dark:disabled:bg-zinc-800 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {isSimulating ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  Simulating Sign-Up...
-                </>
-              ) : (
-                <>
-                  Simulate Partner Sign-Up <UserPlus className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-
-          </form>
-        </div>
-
         {/* Referred Partners List */}
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-3xl shadow-sm space-y-4">
+        <div className="p-6 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-3xl shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-850">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-orange-500" />
@@ -397,7 +326,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
               <span className="text-[10px] text-zinc-400 font-medium">Fetching partners...</span>
             </div>
           ) : referredUsers.length === 0 ? (
-            <div className="py-10 flex flex-col items-center text-center justify-center space-y-3">
+            <div className="py-12 flex flex-col items-center text-center justify-center space-y-3">
               <div className="w-12 h-12 bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-850/60 rounded-full flex items-center justify-center text-zinc-400">
                 <Users className="w-5 h-5 stroke-[1.5]" />
               </div>
@@ -409,7 +338,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
               </div>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
               {referredUsers.map((refUser, i) => (
                 <div 
                   key={refUser.email || i}

@@ -248,7 +248,13 @@ export default function VeloraEarnPage({
       {/* 4. POOLS LIST */}
       <div className="space-y-3">
         <div className="flex justify-between items-center px-1">
-          <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Available Pools</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Available Pools</h3>
+            <span className="inline-flex items-center gap-1 text-[9px] text-orange-500 font-bold bg-orange-500/10 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 border border-orange-500 border-t-transparent rounded-full animate-spin shrink-0" />
+              Streaming Live Revenue...
+            </span>
+          </div>
           <span className="text-[10px] text-zinc-400 font-bold">Showing {filteredCompanies.length} results</span>
         </div>
 
