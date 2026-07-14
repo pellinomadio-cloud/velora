@@ -12,6 +12,20 @@ export default function App() {
   const [authView, setAuthView] = useState<'register' | 'login'>('register');
   const [darkMode, setDarkMode] = useState<boolean>(false);
 
+  // Redirect to register view if a referral link is detected
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const isRefPath = window.location.pathname.includes('/ref');
+      const hasRefParam = params.has('code') || params.has('ref');
+      if (isRefPath || hasRefParam) {
+        setAuthView('register');
+      }
+    } catch (e) {
+      console.error('Error handling referral routing:', e);
+    }
+  }, []);
+
   // Initialize Auth state & Dark Mode preferences
   useEffect(() => {
     // 1. Current User

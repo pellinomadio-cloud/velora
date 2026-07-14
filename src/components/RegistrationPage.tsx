@@ -34,7 +34,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const ref = params.get('ref');
+      const ref = params.get('code') || params.get('ref');
       if (ref) {
         setReferralCode(ref.trim());
       }
@@ -103,7 +103,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
       let referrerUser: User | null = null;
       if (cleanReferral) {
         // Referral code is the referrer's numeric referralCode or username
-        referrerUser = allUsers.find(u => (u.referralCode && u.referralCode.toLowerCase() === cleanReferral) || u.username.toLowerCase() === cleanReferral) || null;
+        referrerUser = allUsers.find(u => (u.referralCode && u.referralCode.toLowerCase() === cleanReferral) || u.username.toLowerCase() === cleanReferral || u.username.toLowerCase().replace(/\s+/g, '') === cleanReferral) || null;
         if (!referrerUser) {
           setError('Referral code not found. Please check or leave blank.');
           setIsLoading(false);
@@ -126,12 +126,6 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         newUserReferredBy = referrerUser.username;
       }
 
-      // Generate a unique 6-digit numeric referral code
-      let numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
-      while (allUsers.some(u => u.referralCode === numericReferralCode)) {
-        numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
-      }
-
       const newUser: User = {
         username: cleanUsername,
         email: cleanEmail,
@@ -142,7 +136,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         darkMode: false,
         referredBy: newUserReferredBy,
-        referralCode: numericReferralCode, // Unique 6-digit numeric referral code
+        referralCode: cleanUsername, // Use username as the referral code
         referralCount: 0,
         referralEarnings: 0,
         kycStatus: 'unverified',

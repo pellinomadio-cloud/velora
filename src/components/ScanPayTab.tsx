@@ -31,15 +31,15 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
 
   // Copy helpers
   const handleCopyCode = () => {
-    const displayCode = user.referralCode || user.username;
+    const displayCode = user.username.toLowerCase().replace(/\s+/g, '');
     navigator.clipboard.writeText(displayCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyLink = () => {
-    const displayCode = user.referralCode || user.username;
-    const link = `https://volerapay.com/register?ref=${displayCode}`;
+    const displayCode = user.username.toLowerCase().replace(/\s+/g, '');
+    const link = `${window.location.origin}/ref?code=${displayCode}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -224,7 +224,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
           <div className="p-4 bg-slate-50/50 dark:bg-zinc-950/40 rounded-2xl border border-slate-100 dark:border-zinc-850 flex items-center justify-between">
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Your Referral Code</span>
-              <span className="text-sm font-extrabold text-zinc-800 dark:text-white font-mono tracking-wide">{user.referralCode || user.username}</span>
+              <span className="text-sm font-extrabold text-zinc-800 dark:text-white font-mono tracking-wide">{user.username.toLowerCase().replace(/\s+/g, '')}</span>
             </div>
             <button
               onClick={handleCopyCode}
@@ -243,7 +243,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Referral Link</span>
               <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[150px] sm:max-w-[180px] block">
-                volerapay.com/register?ref={user.referralCode || user.username}
+                volerapay.com/ref?code={user.username.toLowerCase().replace(/\s+/g, '')}
               </span>
             </div>
             <button
