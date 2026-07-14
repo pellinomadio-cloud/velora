@@ -125,6 +125,17 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     return localStorage.getItem('velora_pwa_installed') === 'true';
   });
   const [isNewUserRegistered, setIsNewUserRegistered] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Monitor browser PWA prompt capability
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
 
   // Check for newly registered user on mount
   useEffect(() => {
@@ -145,7 +156,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
     const interval = setInterval(() => {
       setInstallProgress((prev) => {
-        const next = prev + 5;
+        const next = prev + 1;
         if (next >= 100) {
           clearInterval(interval);
           setInstallStatus('completed');
@@ -172,20 +183,54 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
           return 100;
         }
 
-        // Dynamic step texts
-        if (next < 25) {
+        // Dynamic step texts for 5-second loader duration
+        if (next < 20) {
           setInstallStepText('Handshaking with central ledger...');
-        } else if (next < 50) {
+        } else if (next < 40) {
           setInstallStepText('Provisioning secure sandboxed vault...');
-        } else if (next < 75) {
-          setInstallStepText('Caching offline asset pricing & keys...');
+        } else if (next < 60) {
+          setInstallStepText('Caching offline asset pricing...');
+        } else if (next < 80) {
+          setInstallStepText('Linking native biometric interfaces...');
         } else {
           setInstallStepText('Deploying shortcut daemon & launcher...');
         }
 
         return next;
       });
-    }, 120);
+    }, 50); // 100 steps * 50ms = 5000ms (exactly 5 seconds)
+  };
+
+  const handleNativeOrSimulatedInstall = async () => {
+    if (deferredPrompt) {
+      // Trigger native browser install dialog directly!
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User installation choice outcome: ${outcome}`);
+      if (outcome === 'accepted') {
+        setIsPwaInstalled(true);
+        localStorage.setItem('velora_pwa_installed', 'true');
+        setInstallStatus('completed');
+        // Give installation bonus
+        const rewardAmount = 1000;
+        updateGlobalUser({ ...user, balance: user.balance + rewardAmount });
+        const tx: Transaction = {
+          id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
+          type: 'deposit',
+          title: 'Native App Installation Reward',
+          subtitle: 'Bonus for native setup',
+          amount: rewardAmount,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          status: 'completed',
+          reference: `PWA-NAT-${Math.floor(100000 + Math.random() * 900000)}`
+        };
+        addTransaction(tx);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // Run the beautiful, highly realistic 5-second simulated fallback
+      handleSimulatedInstall();
+    }
   };
   
   // Transaction / Modal states
@@ -2216,21 +2261,43 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 <div className="text-center space-y-3 pt-2">
                   <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-gradient-to-tr from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/5">
                     {/* Beautiful Geometric Volera App Logo */}
-                    <svg className="w-16 h-16 drop-shadow-[0_4px_12px_rgba(249,115,22,0.3)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="50" cy="50" r="45" stroke="url(#logoGradModal)" strokeWidth="4.5" strokeLinecap="round" className="animate-[spin_15s_linear_infinite]" strokeDasharray="160 50" />
-                      <path d="M50 18 L76 34 V60 L50 82 L24 60 V34 L50 18 Z" stroke="rgba(249,115,22,0.15)" strokeWidth="1" />
-                      <path d="M32 36 L50 25 L68 36 V58 L50 72 L32 58 V36 Z" fill="url(#innerGradModal)" />
-                      <path d="M41 38 H46 L50 54 L54 38 H59 L52 62 H48 L41 38 Z" fill="white" />
-                      <circle cx="50" cy="71" r="2.5" fill="#F97316" className="animate-ping" />
+                    <svg className="w-20 h-20 drop-shadow-[0_0_25px_rgba(249,115,22,0.35)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="50" cy="50" r="46" stroke="url(#logoGradModal)" strokeWidth="1.5" strokeLinecap="round" className="animate-[spin_20s_linear_infinite_reverse]" strokeDasharray="6 8" />
+                      <circle cx="50" cy="50" r="41" stroke="url(#logoGradModal)" strokeWidth="4.5" strokeLinecap="round" className="animate-[spin_12s_linear_infinite]" strokeDasharray="160 50" />
+                      <circle cx="50" cy="50" r="34" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      
+                      <polygon points="50,22 75,36 75,64 50,78 25,64 25,36" fill="url(#hexBackdropModal)" stroke="url(#hexBorderModal)" strokeWidth="1.5" />
+                      
+                      <path d="M33,35 L50,68 L42,73 L23,40 Z" fill="url(#vLeftGradModal)" />
+                      <path d="M67,35 L50,68 L58,73 L77,40 Z" fill="url(#vRightGradModal)" />
+                      
+                      <path d="M50,68 L42,73 L47,52 Z" fill="rgba(255,255,255,0.22)" />
+                      <path d="M50,68 L58,73 L53,52 Z" fill="rgba(255,255,255,0.12)" />
+                      
+                      <circle cx="50" cy="42" r="3" fill="#FFFFFF" className="animate-pulse" />
+                      <circle cx="50" cy="42" r="7.5" stroke="url(#logoGradModal)" strokeWidth="1" className="animate-ping opacity-60" />
+
                       <defs>
                         <linearGradient id="logoGradModal" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
                           <stop offset="0%" stopColor="#F97316" />
                           <stop offset="50%" stopColor="#F59E0B" />
                           <stop offset="100%" stopColor="#EA580C" />
                         </linearGradient>
-                        <linearGradient id="innerGradModal" x1="32" y1="25" x2="68" y2="72" gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="rgba(249,115,22,0.25)" />
-                          <stop offset="100%" stopColor="rgba(234,88,12,0.03)" />
+                        <linearGradient id="hexBackdropModal" x1="50" y1="22" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#1E1F22" />
+                          <stop offset="100%" stopColor="#090A0C" />
+                        </linearGradient>
+                        <linearGradient id="hexBorderModal" x1="25" y1="36" x2="75" y2="64" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
+                          <stop offset="100%" stopColor="#EA580C" stopOpacity="0.1" />
+                        </linearGradient>
+                        <linearGradient id="vLeftGradModal" x1="23" y1="40" x2="50" y2="68" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#F59E0B" />
+                          <stop offset="100%" stopColor="#D97706" />
+                        </linearGradient>
+                        <linearGradient id="vRightGradModal" x1="50" y1="68" x2="77" y2="40" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#F97316" />
+                          <stop offset="100%" stopColor="#EA580C" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -2318,11 +2385,11 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   {installStatus === 'idle' ? (
                     <div className="space-y-3">
                       <button
-                        onClick={handleSimulatedInstall}
+                        onClick={handleNativeOrSimulatedInstall}
                         className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
                       >
                         <Download className="w-4 h-4" />
-                        One-Click Fast Install
+                        <span>{deferredPrompt ? 'INSTALL NATIVELY' : 'INSTALL NOW'}</span>
                       </button>
                       
                       {isNewUserRegistered && (
