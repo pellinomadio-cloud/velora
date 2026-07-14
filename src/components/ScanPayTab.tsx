@@ -39,7 +39,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
 
   const handleCopyLink = () => {
     const displayCode = user.username.toLowerCase().replace(/\s+/g, '');
-    const link = `${window.location.origin}/ref?code=${displayCode}`;
+    const link = `${window.location.origin}/?ref=${displayCode}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -243,7 +243,7 @@ export default function ScanPayTab({ user, onDeductBalance, onAddTransaction, on
             <div>
               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Referral Link</span>
               <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[150px] sm:max-w-[180px] block">
-                volerapay.com/ref?code={user.username.toLowerCase().replace(/\s+/g, '')}
+                volerapay.com?ref={user.username.toLowerCase().replace(/\s+/g, '')}
               </span>
             </div>
             <button
