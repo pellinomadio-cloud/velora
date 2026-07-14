@@ -34,7 +34,16 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const ref = params.get('code') || params.get('ref');
+      let ref = params.get('code') || params.get('ref');
+      
+      if (!ref) {
+        ref = sessionStorage.getItem('pending_referral_code') || localStorage.getItem('pending_referral_code');
+      } else {
+        // Keep it in storage if found in URL
+        sessionStorage.setItem('pending_referral_code', ref.trim().toLowerCase());
+        localStorage.setItem('pending_referral_code', ref.trim().toLowerCase());
+      }
+
       if (ref) {
         setReferralCode(ref.trim());
       }
@@ -214,6 +223,14 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
 
       // Save new user as logged in
       localStorage.setItem('velora_current_user', JSON.stringify(newUser));
+
+      // Clear pending referral code from storage
+      try {
+        sessionStorage.removeItem('pending_referral_code');
+        localStorage.removeItem('pending_referral_code');
+      } catch (e) {
+        console.error('Error clearing pending referral code:', e);
+      }
 
       onRegisterComplete(newUser);
     } catch (err: any) {

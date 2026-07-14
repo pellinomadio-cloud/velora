@@ -18,6 +18,14 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const isRefPath = window.location.pathname.includes('/ref');
       const hasRefParam = params.has('code') || params.has('ref');
+      
+      const code = params.get('code') || params.get('ref');
+      if (code) {
+        const cleanCode = code.trim().toLowerCase();
+        sessionStorage.setItem('pending_referral_code', cleanCode);
+        localStorage.setItem('pending_referral_code', cleanCode);
+      }
+
       if (isRefPath || hasRefParam) {
         setAuthView('register');
       }
