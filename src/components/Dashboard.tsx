@@ -311,6 +311,9 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 setTransactions(prevTxs => [offlineTx, ...prevTxs]);
               }, 100);
 
+              // Sync updated user to Firebase immediately
+              syncUserToFirebase(updatedUser).catch(err => console.warn('Failed to sync offline earnings:', err));
+
               return updatedUser;
             });
           }
@@ -354,6 +357,10 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
             accounts[index] = updatedUser;
             localStorage.setItem('velora_accounts', JSON.stringify(accounts));
           }
+          
+          // Sync to Firebase to keep the DB intact
+          syncUserToFirebase(updatedUser).catch(err => console.warn('Failed to sync active earnings:', err));
+          
           return updatedUser;
         });
       }
@@ -365,6 +372,12 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     return () => clearInterval(interval);
   }, [joinedCompanies, user.email, user.kycStatus]);
 
+  // Keep a mutable ref to the latest user object to avoid stale closures in listeners
+  const latestUserRef = React.useRef(user);
+  useEffect(() => {
+    latestUserRef.current = user;
+  }, [user]);
+
   // Listen to real-time changes of the user profile on Firestore
   useEffect(() => {
     if (!user || !user.email) return;
@@ -373,15 +386,16 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as User;
-        // Check if any of the critical fields changed
+        const currentRefUser = latestUserRef.current;
+        // Check if any of the critical fields changed (using a small delta for float balance)
         if (
-          data.balance !== user.balance ||
-          data.kycStatus !== user.kycStatus ||
-          data.kycPlan !== user.kycPlan ||
-          data.cardActivationStatus !== user.cardActivationStatus ||
-          data.isBanned !== user.isBanned ||
-          data.username !== user.username ||
-          data.avatarUrl !== user.avatarUrl
+          Math.abs((data.balance || 0) - (currentRefUser.balance || 0)) > 0.01 ||
+          data.kycStatus !== currentRefUser.kycStatus ||
+          data.kycPlan !== currentRefUser.kycPlan ||
+          data.cardActivationStatus !== currentRefUser.cardActivationStatus ||
+          data.isBanned !== currentRefUser.isBanned ||
+          data.username !== currentRefUser.username ||
+          data.avatarUrl !== currentRefUser.avatarUrl
         ) {
           setUser(data);
           localStorage.setItem('velora_current_user', JSON.stringify(data));
@@ -781,7 +795,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     <div className={`min-h-screen transition-colors duration-300 flex justify-center items-start ${darkMode ? 'dark bg-zinc-950' : 'bg-white'}`}>
       
       {/* Mobile Frame Wrapper to emulate the gorgeous layout exactly */}
-      <div className={`w-full max-w-md bg-white dark:bg-zinc-900 min-h-screen shadow-2xl relative flex flex-col justify-between ${currentScreen === 'main' ? 'pb-24' : 'pb-6'} overflow-hidden border-x border-slate-100 dark:border-zinc-800/80`}>
+      <div className={`w-full max-w-md bg-white dark:bg-zinc-900 h-screen max-h-screen shadow-2xl relative flex flex-col justify-between ${currentScreen === 'main' ? 'pb-24' : 'pb-6'} overflow-hidden border-x border-slate-100 dark:border-zinc-800/80`}>
         
         {/* Scrollable Body Content */}
         <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6">

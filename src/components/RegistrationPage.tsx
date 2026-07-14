@@ -164,7 +164,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
       // Check referral code validity if entered
       let referrerUser: User | null = null;
       if (cleanReferral) {
-        referrerUser = allUsers.find(u => u.username.toLowerCase() === cleanReferral) || null;
+        referrerUser = allUsers.find(u => (u.referralCode && u.referralCode.toLowerCase() === cleanReferral) || u.username.toLowerCase() === cleanReferral) || null;
         if (!referrerUser) {
           setError('Referral code not found. Please check or leave blank.');
           setIsLoading(false);
@@ -186,6 +186,12 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         newUserReferredBy = referrerUser.username;
       }
 
+      // Generate a unique 6-digit numeric referral code
+      let numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
+      while (allUsers.some(u => u.referralCode === numericReferralCode)) {
+        numericReferralCode = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+
       const newUser: User = {
         username: cleanUsername,
         email: cleanEmail,
@@ -196,7 +202,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
         joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         darkMode: false,
         referredBy: newUserReferredBy,
-        referralCode: cleanUsername,
+        referralCode: numericReferralCode,
         referralCount: 0,
         referralEarnings: 0,
         kycStatus: 'unverified',
