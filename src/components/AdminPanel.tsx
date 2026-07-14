@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Lock, Users, ShieldCheck, ShieldAlert, Eye, X, Check, Search, Trash2, RotateCcw } from 'lucide-react';
-import { User } from '../types';
+import { User, Transaction } from '../types';
 import {
   getAllUsersFromFirebase,
   syncUserToFirebase,
   getSystemConfigFromFirebase,
-  updateSystemConfigInFirebase
+  updateSystemConfigInFirebase,
+  syncTransactionToFirebase
 } from '../firebaseSync';
 
 interface AdminPanelProps {
@@ -228,6 +229,33 @@ export default function AdminPanel({ onBack, onRefreshUser }: AdminPanelProps) {
           localStorage.setItem('velora_current_user', JSON.stringify(parsed));
         }
       } catch (err) {}
+    }
+
+    // UPDATE PENDING WITHDRAWALS FOR THIS USER TO COMPLETED!
+    const savedTxs = localStorage.getItem(`velora_txs_${userEmail.toLowerCase()}`);
+    if (savedTxs) {
+      try {
+        const txs: Transaction[] = JSON.parse(savedTxs);
+        let txsChanged = false;
+        const updatedTxs = txs.map((tx) => {
+          if (tx.status === 'pending' && tx.type === 'send') {
+            txsChanged = true;
+            const updatedTx = { ...tx, status: 'completed' as const };
+            // Sync to Firebase
+            syncTransactionToFirebase(userEmail, updatedTx).catch((e) =>
+              console.warn('Failed to sync completed transaction to Firebase:', e)
+            );
+            return updatedTx;
+          }
+          return tx;
+        });
+
+        if (txsChanged) {
+          localStorage.setItem(`velora_txs_${userEmail.toLowerCase()}`, JSON.stringify(updatedTxs));
+        }
+      } catch (err) {
+        console.warn('Failed to update pending withdrawals in local storage:', err);
+      }
     }
 
     // Sync to Firestore

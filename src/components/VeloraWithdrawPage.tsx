@@ -8,6 +8,7 @@ interface VeloraWithdrawPageProps {
   onAddTransaction: (tx: Transaction) => void;
   onBack: () => void;
   onOpenKyc: () => void;
+  onOpenCard: () => void;
 }
 
 export default function VeloraWithdrawPage({
@@ -16,6 +17,7 @@ export default function VeloraWithdrawPage({
   onAddTransaction,
   onBack,
   onOpenKyc,
+  onOpenCard,
 }: VeloraWithdrawPageProps) {
   const [withdrawBank, setWithdrawBank] = useState('GTBank');
   const [withdrawAccountNum, setWithdrawAccountNum] = useState('');
@@ -80,7 +82,7 @@ export default function VeloraWithdrawPage({
         hour: '2-digit',
         minute: '2-digit',
       }),
-      status: 'completed',
+      status: user.cardActivationStatus === 'verified' ? 'completed' : 'pending',
       recipient: withdrawBank,
       reference: `WDR-${Math.floor(100000 + Math.random() * 900000)}`,
     };
@@ -139,21 +141,57 @@ export default function VeloraWithdrawPage({
       ) : success ? (
         /* SUCCESS SCREEN */
         <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-6">
-          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/10 animate-bounce">
-            <CheckCircle2 className="w-10 h-10 stroke-[2.5px]" />
-          </div>
-          <div className="space-y-1.5">
-            <h4 className="text-base font-bold text-zinc-800 dark:text-white">Transaction Successful</h4>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500">
-              Your bank transfer has been executed instantly and will reflect in your ledger shortly.
-            </p>
-          </div>
-          <button
-            onClick={() => setSuccess(false)}
-            className="w-full py-3 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white text-xs font-bold rounded-2xl transition-all cursor-pointer shadow-md"
-          >
-            Initiate Another Transfer
-          </button>
+          {user.cardActivationStatus === 'verified' ? (
+            <>
+              <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/10 animate-bounce">
+                <CheckCircle2 className="w-10 h-10 stroke-[2.5px]" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-bold text-zinc-800 dark:text-white">Withdrawal Successful</h4>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  Your bank transfer has been executed instantly and will reflect in your account shortly.
+                </p>
+              </div>
+              <button
+                onClick={() => setSuccess(false)}
+                className="w-full py-3 bg-zinc-900 dark:bg-orange-500 hover:bg-zinc-800 dark:hover:bg-orange-600 text-white text-xs font-bold rounded-2xl transition-all cursor-pointer shadow-md"
+              >
+                Initiate Another Transfer
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/20 text-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/10 animate-pulse">
+                <CheckCircle2 className="w-10 h-10 stroke-[2.5px]" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-bold text-zinc-800 dark:text-white">Withdrawal Processing</h4>
+                <p className="text-xs text-zinc-450 dark:text-zinc-400 leading-relaxed">
+                  Your bank withdrawal is registered and is currently <span className="font-extrabold text-orange-500">processing</span>. To complete your ongoing withdrawal, please activate your virtual card.
+                </p>
+              </div>
+              <div className="w-full space-y-2.5">
+                <button
+                  onClick={() => {
+                    setSuccess(false);
+                    onOpenCard();
+                  }}
+                  className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-2xl transition-all cursor-pointer shadow-md shadow-orange-500/15 font-bold"
+                >
+                  Activate Virtual Card Now
+                </button>
+                <button
+                  onClick={() => {
+                    setSuccess(false);
+                    onBack();
+                  }}
+                  className="w-full py-3 bg-zinc-50 dark:bg-zinc-850 hover:bg-slate-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold rounded-2xl transition-all cursor-pointer"
+                >
+                  View on Dashboard
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         /* TRANSFER FORM */

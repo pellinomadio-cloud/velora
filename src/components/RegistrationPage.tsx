@@ -223,6 +223,7 @@ export default function RegistrationPage({ onRegisterComplete, onNavigateToLogin
 
       // Save new user as logged in
       localStorage.setItem('velora_current_user', JSON.stringify(newUser));
+      localStorage.setItem('velora_just_registered', 'true');
 
       // Clear pending referral code from storage
       try {

@@ -34,7 +34,10 @@ import {
   History,
   ArrowLeft,
   ShieldCheck,
-  MessageCircle
+  MessageCircle,
+  Smartphone,
+  Download,
+  Check
 } from 'lucide-react';
 import { User, Transaction, ESimPlan } from '../types';
 import { EARN_COMPANIES, EarnCompany } from '../data/companies';
@@ -110,6 +113,80 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   const [displayCurrency, setDisplayCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Install Volera States
+  const [showInstallFloat, setShowInstallFloat] = useState(true);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [installDeviceTab, setInstallDeviceTab] = useState<'android' | 'ios'>('android');
+  const [installStatus, setInstallStatus] = useState<'idle' | 'installing' | 'completed'>('idle');
+  const [installProgress, setInstallProgress] = useState(0);
+  const [installStepText, setInstallStepText] = useState('Initiating registration handshakes...');
+  const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
+    return localStorage.getItem('velora_pwa_installed') === 'true';
+  });
+  const [isNewUserRegistered, setIsNewUserRegistered] = useState(false);
+
+  // Check for newly registered user on mount
+  useEffect(() => {
+    const justRegistered = localStorage.getItem('velora_just_registered');
+    if (justRegistered === 'true') {
+      setIsNewUserRegistered(true);
+      // Automatically open the install modal for a new registered user!
+      setShowInstallModal(true);
+      localStorage.removeItem('velora_just_registered'); // clear to avoid repeating
+    }
+  }, []);
+
+  const handleSimulatedInstall = () => {
+    if (installStatus !== 'idle') return;
+    setInstallStatus('installing');
+    setInstallProgress(0);
+    setInstallStepText('Initiating secure handshakes...');
+
+    const interval = setInterval(() => {
+      setInstallProgress((prev) => {
+        const next = prev + 5;
+        if (next >= 100) {
+          clearInterval(interval);
+          setInstallStatus('completed');
+          setIsPwaInstalled(true);
+          localStorage.setItem('velora_pwa_installed', 'true');
+
+          // Add a beautiful registration/installation reward of ₦1,000!
+          const rewardAmount = 1000;
+          const updatedUser = { ...user, balance: user.balance + rewardAmount };
+          updateGlobalUser(updatedUser);
+
+          const tx: Transaction = {
+            id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
+            type: 'deposit',
+            title: 'App Installation Reward',
+            subtitle: 'Bonus for setting up Volera on device',
+            amount: rewardAmount,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            status: 'completed',
+            reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
+          };
+          addTransaction(tx);
+
+          return 100;
+        }
+
+        // Dynamic step texts
+        if (next < 25) {
+          setInstallStepText('Handshaking with central ledger...');
+        } else if (next < 50) {
+          setInstallStepText('Provisioning secure sandboxed vault...');
+        } else if (next < 75) {
+          setInstallStepText('Caching offline asset pricing & keys...');
+        } else {
+          setInstallStepText('Deploying shortcut daemon & launcher...');
+        }
+
+        return next;
+      });
+    }, 120);
+  };
   
   // Transaction / Modal states
   const [activeModal, setActiveModal] = useState<'add_money' | 'withdraw' | 'airtime' | 'data' | 'earn' | 'trade' | 'transactions' | null>(null);
@@ -826,6 +903,10 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
               onAddTransaction={addTransaction}
               onBack={() => setCurrentScreen('main')}
               onOpenKyc={() => setCurrentScreen('kyc')}
+              onOpenCard={() => {
+                setCurrentScreen('main');
+                setActiveTab('card');
+              }}
             />
           ) : currentScreen === 'transactions' ? (
             <VeloraTransactionsPage
@@ -924,6 +1005,19 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 className="space-y-6"
               >
                 
+                {/* Pending Withdrawal Warning Banner */}
+                {transactions.some(tx => tx.status === 'pending' && tx.type === 'send') && (
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-900/30 rounded-3xl flex items-start gap-2.5 shadow-sm">
+                    <AlertCircle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="space-y-1 text-left">
+                      <p className="text-[11px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-wide">Ongoing Withdrawal Processing</p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-450 leading-relaxed font-semibold">
+                        Please <button onClick={() => setActiveTab('card')} className="font-black text-orange-500 hover:underline bg-transparent border-none p-0 cursor-pointer">activate virtual card</button> to complete your ongoing withdrawal.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. WALLET BALANCE CARD (Matches visual screenshot exactly) */}
                 <div className="w-full bg-[#1E1F22] dark:bg-zinc-950 text-white rounded-[32px] p-6 shadow-xl relative overflow-hidden flex flex-col justify-between h-[230px] border border-white/5">
                   {/* Subtle Grid overlay inside card */}
@@ -2067,6 +2161,239 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
                   </div>
                 )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating Install App Toggle Tab */}
+        {showInstallFloat && (
+          <div className="fixed right-0 top-[35%] z-[100] flex flex-col items-end pointer-events-none select-none">
+            <div className="pointer-events-auto flex items-center relative group">
+              {/* Pulsing indicator if not installed */}
+              {!isPwaInstalled && (
+                <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                </span>
+              )}
+
+              {/* Collapsible/Expandable Pull Tab */}
+              <button
+                onClick={() => setShowInstallModal(true)}
+                className="flex items-center gap-2.5 bg-gradient-to-l from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white pl-4 pr-3.5 py-3 rounded-l-3xl shadow-2xl border-y border-l border-white/10 transition-all duration-300 cursor-pointer group-hover:pl-5 group-hover:translate-x-[-2px] active:scale-95"
+              >
+                <Smartphone className={`w-4 h-4 ${!isPwaInstalled ? 'animate-bounce' : ''}`} />
+                <span className="text-[10px] font-black tracking-widest uppercase max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-500 ease-in-out whitespace-nowrap">
+                  {isPwaInstalled ? 'Installed' : 'Install Volera'}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${isPwaInstalled ? 'bg-emerald-400' : 'bg-orange-300 animate-pulse'}`} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Immersive Installation Modal */}
+        <AnimatePresence>
+          {showInstallModal && (
+            <div className="fixed inset-0 bg-black/70 dark:bg-zinc-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="w-full max-w-md bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-[32px] overflow-hidden shadow-2xl relative p-6 space-y-6 select-none"
+              >
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowInstallModal(false)}
+                  className="absolute right-5 top-5 p-2 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                {/* Brand Logo & Presentation */}
+                <div className="text-center space-y-3 pt-2">
+                  <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-gradient-to-tr from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/5">
+                    {/* Beautiful Geometric Volera App Logo */}
+                    <svg className="w-16 h-16 drop-shadow-[0_4px_12px_rgba(249,115,22,0.3)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="50" cy="50" r="45" stroke="url(#logoGradModal)" strokeWidth="4.5" strokeLinecap="round" className="animate-[spin_15s_linear_infinite]" strokeDasharray="160 50" />
+                      <path d="M50 18 L76 34 V60 L50 82 L24 60 V34 L50 18 Z" stroke="rgba(249,115,22,0.15)" strokeWidth="1" />
+                      <path d="M32 36 L50 25 L68 36 V58 L50 72 L32 58 V36 Z" fill="url(#innerGradModal)" />
+                      <path d="M41 38 H46 L50 54 L54 38 H59 L52 62 H48 L41 38 Z" fill="white" />
+                      <circle cx="50" cy="71" r="2.5" fill="#F97316" className="animate-ping" />
+                      <defs>
+                        <linearGradient id="logoGradModal" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#F97316" />
+                          <stop offset="50%" stopColor="#F59E0B" />
+                          <stop offset="100%" stopColor="#EA580C" />
+                        </linearGradient>
+                        <linearGradient id="innerGradModal" x1="32" y1="25" x2="68" y2="72" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="rgba(249,115,22,0.25)" />
+                          <stop offset="100%" stopColor="rgba(234,88,12,0.03)" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
+                      Install Volera Web App
+                    </h2>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto leading-normal font-semibold">
+                      Run Volera natively on your phone with zero app-store downloads. Secure, light, and hyper-responsive.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Segmented Device Selector tabs */}
+                <div className="grid grid-cols-2 p-1 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-slate-100 dark:border-zinc-850">
+                  <button
+                    onClick={() => setInstallDeviceTab('android')}
+                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      installDeviceTab === 'android'
+                        ? 'bg-white dark:bg-zinc-850 text-orange-500 dark:text-orange-400 shadow-sm'
+                        : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Android OS
+                  </button>
+                  <button
+                    onClick={() => setInstallDeviceTab('ios')}
+                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      installDeviceTab === 'ios'
+                        ? 'bg-white dark:bg-zinc-850 text-orange-500 dark:text-orange-400 shadow-sm'
+                        : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 170 170">
+                      <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.37-6.15-2.92-2.35-6.72-6.83-11.4-13.43-5.23-7.41-9.57-16-13.01-25.77-3.44-9.77-5.17-19.16-5.17-28.16 0-14.03 3.86-25.04 11.58-33.02 7.71-7.98 17.11-12 28.19-12.06 5.43 0 10.99 1.51 16.66 4.54 5.68 3.03 9.4 4.54 11.16 4.54 1.48 0 5.16-1.53 11.06-4.58 5.9-3.05 11.1-4.51 15.61-4.4 15.42.33 26.96 5.97 34.62 16.92-13.43 8.16-20.01 19.34-19.75 33.56.27 10.66 4.13 19.38 11.58 26.16 7.45 6.78 16.14 10.5 26.06 11.16-.6 2.92-1.84 6.36-3.71 10.33zM119.53 19.14c0 10.33-4.12 19.57-12.35 27.72-8.23 8.16-17.58 12.56-28.06 13.2-1.03-10.79 3.19-20.35 11.47-28.69 8.28-8.34 18.06-12.8 28.15-13.39.79 1.16.79 1.16.79 1.16z" />
+                    </svg>
+                    Apple iOS
+                  </button>
+                </div>
+
+                {/* Steps and Guide Container */}
+                <div className="p-4 bg-slate-50 dark:bg-zinc-950 rounded-3xl border border-slate-100/60 dark:border-zinc-850/50 text-left space-y-3.5">
+                  <p className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">
+                    Manual Steps:
+                  </p>
+                  
+                  {installDeviceTab === 'android' ? (
+                    <div className="space-y-3 text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-semibold">
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
+                        <span>Open Chrome options by tapping the Menu icon (<strong className="font-extrabold text-zinc-900 dark:text-white">⋮</strong>) in the top-right toolbar.</span>
+                      </div>
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
+                        <span>Find and select <strong className="font-extrabold text-zinc-900 dark:text-white">"Add to Home screen"</strong> or <strong className="font-extrabold text-zinc-900 dark:text-white">"Install app"</strong>.</span>
+                      </div>
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
+                        <span>Confirm prompt to place Volera securely on your home screen launcher.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-semibold">
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
+                        <span>Tap Safari's <strong className="font-extrabold text-zinc-900 dark:text-white">Share</strong> button (<strong className="font-extrabold text-zinc-900 dark:text-white">⎋</strong>) on the bottom navigation bar.</span>
+                      </div>
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
+                        <span>Scroll through options and click <strong className="font-extrabold text-zinc-900 dark:text-white">"Add to Home Screen"</strong> (<strong className="font-extrabold text-zinc-900 dark:text-white">+</strong>).</span>
+                      </div>
+                      <div className="flex gap-2.5 items-start">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
+                        <span>Tap <strong className="font-extrabold text-zinc-900 dark:text-white">Add</strong> in the top-right corner to save launcher icon.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Automated installation engine panel */}
+                <div className="space-y-3.5 text-center">
+                  {installStatus === 'idle' ? (
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleSimulatedInstall}
+                        className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
+                      >
+                        <Download className="w-4 h-4" />
+                        One-Click Fast Install
+                      </button>
+                      
+                      {isNewUserRegistered && (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                          <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 text-left uppercase tracking-wide">
+                            Install bonus active: Complete installation to earn +₦1,000 immediately!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : installStatus === 'installing' ? (
+                    <div className="p-5 bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-850 rounded-3xl space-y-4">
+                      {/* Progress bar */}
+                      <div className="flex justify-between items-center text-[10px] font-black text-zinc-500 tracking-wider">
+                        <span className="uppercase text-orange-500 animate-pulse">{installStepText}</span>
+                        <span>{installProgress}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+                        <div
+                          className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-150 ease-out"
+                          style={{ width: `${installProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                        Do not close the web application...
+                      </p>
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="p-5 bg-emerald-50 dark:bg-emerald-950/15 border border-emerald-100 dark:border-emerald-950/30 rounded-3xl text-center space-y-3.5"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-500 flex items-center justify-center mx-auto shadow-inner">
+                        <Check className="w-6 h-6 stroke-[3]" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">
+                          Volera Installed!
+                        </p>
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold max-w-xs mx-auto leading-relaxed">
+                          The native container is configured. Launcher added to Home screen with TLS 1.3 encryption keys.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-white dark:bg-zinc-900 border border-emerald-100/50 dark:border-emerald-900/10 rounded-2xl flex items-center justify-between text-left">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center text-white font-black text-xs">V</div>
+                          <div>
+                            <p className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Installation Bonus</p>
+                            <p className="text-[8px] text-zinc-400 font-bold">Credited successfully</p>
+                          </div>
+                        </div>
+                        <p className="text-xs font-black text-emerald-500">+₦1,000.00</p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowInstallModal(false)}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
+                      >
+                        Launch Dashboard
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Footer specs */}
+                <div className="text-center text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-relaxed pt-1.5 border-t border-slate-50 dark:border-zinc-850">
+                  Volera PWA Secure Shell (v2.4.0) • Offline-ready • 2.4 MB
+                </div>
               </motion.div>
             </div>
           )}

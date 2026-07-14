@@ -25,6 +25,7 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingError, setSubmittingError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'two_key' | 'three_key' | 'unlimited'>('two_key');
+  const [kycStep, setKycStep] = useState<'select_plan' | 'payment'>('select_plan');
 
   // Dynamic company payment details from localStorage (modifiable by Admin)
   const [accountDetails, setAccountDetails] = useState(() => {
@@ -202,7 +203,13 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
       {/* Header */}
       <div className="flex items-center gap-4 py-4 border-b border-slate-100 dark:border-zinc-800 mb-6">
         <button
-          onClick={onBack}
+          onClick={() => {
+            if (unlockState === 'unlocked' && kycStep === 'payment') {
+              setKycStep('select_plan');
+            } else {
+              onBack();
+            }
+          }}
           className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-850 text-zinc-600 dark:text-zinc-400 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -296,211 +303,249 @@ export default function KYCPage({ user, onBack, onSubmitKYC }: KYCPageProps) {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 pb-6">
-          {/* Promo Card */}
-          <div className="p-4 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-zinc-950 rounded-3xl shadow-md space-y-1.5 relative overflow-hidden">
-            <div className="absolute top-[-30%] right-[-10%] w-[50%] h-[120%] bg-white/20 rounded-full blur-xl pointer-events-none" />
-            <h3 className="text-xs font-black uppercase tracking-wider opacity-90">One-time Activation Fee</h3>
-            <p className="text-2xl font-black text-zinc-950">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</p>
-            <p className="text-[10px] opacity-90 leading-relaxed font-semibold">
-              Pay the {selectedPlan === 'two_key' ? 'Basic' : selectedPlan === 'three_key' ? 'Premium' : 'Unlimited'} KYC activation fee of <strong className="font-black">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</strong> into our bank account below and upload your transfer slip to unlock daily revenue passive pools.
-            </p>
-          </div>
-
-          {/* Plan Selector */}
-          <div className="space-y-2.5">
-            <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block">Select KYC Plan & Benefits</label>
-            <div className="grid grid-cols-1 gap-2.5">
-              {[
-                {
-                  id: 'two_key',
-                  name: 'Basic Revenue Partner',
-                  price: getDynamicPlanFee('two_key'),
-                  benefits: '2 keys for joining two revenue per day'
-                },
-                {
-                  id: 'three_key',
-                  name: 'Premium Revenue Partner',
-                  price: getDynamicPlanFee('three_key'),
-                  benefits: 'Benefit for joining three revenue per day'
-                },
-                {
-                  id: 'unlimited',
-                  name: 'Unlimited Revenue Partner',
-                  price: getDynamicPlanFee('unlimited'),
-                  benefits: 'Unlimited joining of revenue per day'
-                }
-              ].map((plan) => {
-                const isSelected = selectedPlan === plan.id;
-                return (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    onClick={() => setSelectedPlan(plan.id as any)}
-                    className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
-                      isSelected
-                        ? 'border-amber-500 bg-amber-500/5 dark:bg-amber-500/10 shadow-sm'
-                        : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center w-full">
-                      <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
-                        {plan.name}
-                      </span>
-                      <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-900 dark:text-white'}`}>
-                        ₦{plan.price.toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">
-                      {plan.benefits}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* OPay Strict Prohibition Warning Card */}
-          <div className="p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-900/30 rounded-3xl flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h5 className="text-[11px] font-extrabold text-red-700 dark:text-red-400 uppercase tracking-wider">⚠️ DO NOT PAY VIA OPAY</h5>
-              <p className="text-[10px] text-red-600 dark:text-red-450 leading-relaxed font-semibold">
-                Transfer from <strong className="font-black text-red-700 dark:text-red-400">OPay accounts is strictly NOT ALLOWED</strong> and will fail compliance routing. Please use other banks like <strong className="font-black text-red-700 dark:text-red-450">Kuda, PalmPay, GTBank, Zenith, Access Bank, Moniepoint</strong>, etc., which are fully automated and verified instantly.
-              </p>
-            </div>
-          </div>
-
-          {/* Account Details Box */}
-          <div className="p-5 bg-slate-50 dark:bg-zinc-950 rounded-3xl border border-slate-100 dark:border-zinc-850 space-y-4 shadow-inner">
-            <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Company Payment Details</h4>
-            
-            <div className="space-y-3.5">
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Bank Name</span>
-                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{accountDetails.bankName}</span>
+          {kycStep === 'select_plan' ? (
+            <>
+              {/* Promo Card */}
+              <div className="p-4 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-zinc-950 rounded-3xl shadow-md space-y-1.5 relative overflow-hidden">
+                <div className="absolute top-[-30%] right-[-10%] w-[50%] h-[120%] bg-white/20 rounded-full blur-xl pointer-events-none" />
+                <h3 className="text-xs font-black uppercase tracking-wider opacity-90">One-time Activation Fee</h3>
+                <p className="text-2xl font-black text-zinc-950">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</p>
+                <p className="text-[10px] opacity-90 leading-relaxed font-semibold">
+                  Pay the {selectedPlan === 'two_key' ? 'Basic' : selectedPlan === 'three_key' ? 'Premium' : 'Unlimited'} KYC activation fee of <strong className="font-black">₦{getDynamicPlanFee(selectedPlan).toLocaleString()}</strong> to unlock daily revenue passive pools.
+                </p>
               </div>
 
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Account Number</span>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-sm font-mono font-black text-zinc-900 dark:text-white tracking-widest">{accountDetails.accountNumber}</span>
-                  <button
-                    onClick={handleCopy}
-                    className="p-2 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-850 rounded-xl border border-slate-200/50 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span className="text-[10px] font-bold">{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
+              {/* Plan Selector */}
+              <div className="space-y-2.5">
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block">Select KYC Plan & Benefits</label>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {[
+                    {
+                      id: 'two_key',
+                      name: 'Basic Revenue Partner',
+                      price: getDynamicPlanFee('two_key'),
+                      benefits: '2 keys for joining two revenue per day'
+                    },
+                    {
+                      id: 'three_key',
+                      name: 'Premium Revenue Partner',
+                      price: getDynamicPlanFee('three_key'),
+                      benefits: 'Benefit for joining three revenue per day'
+                    },
+                    {
+                      id: 'unlimited',
+                      name: 'Unlimited Revenue Partner',
+                      price: getDynamicPlanFee('unlimited'),
+                      benefits: 'Unlimited joining of revenue per day'
+                    }
+                  ].map((plan) => {
+                    const isSelected = selectedPlan === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setSelectedPlan(plan.id as any)}
+                        className={`p-3.5 rounded-2xl text-left border transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'border-amber-500 bg-amber-500/5 dark:bg-amber-500/10 shadow-sm'
+                            : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                            {plan.name}
+                          </span>
+                          <span className={`text-xs font-black ${isSelected ? 'text-amber-500' : 'text-zinc-900 dark:text-white'}`}>
+                            ₦{plan.price.toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">
+                          {plan.benefits}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div>
-                <span className="text-[10px] text-zinc-400 block">Account Name</span>
-                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase">{accountDetails.accountName}</span>
-              </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex items-start gap-2.5">
-                <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-normal">
-                  <strong>Important:</strong> Ensure you include your username <code className="bg-amber-100 dark:bg-amber-900/35 px-1 py-0.5 rounded font-bold">"{user.username}"</code> as narration or transfer reference for swift automated verification.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Form and Proof Upload */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Upload Payment Proof</label>
-              
-              <div
-                onDragEnter={handleDrag}
-                onDragOver={handleDrag}
-                onDragLeave={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-3xl p-6 text-center transition-all ${
-                  dragActive 
-                    ? 'border-orange-500 bg-orange-500/5' 
-                    : proof 
-                      ? 'border-emerald-500/50 bg-emerald-500/5' 
-                      : 'border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950'
-                }`}
+              {/* Action Button */}
+              <button
+                type="button"
+                onClick={() => setKycStep('payment')}
+                className="w-full py-4 mt-2 bg-orange-500 hover:bg-orange-600 text-white font-extrabold rounded-2xl text-xs transition-all shadow-md shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2"
               >
-                {proof ? (
-                  <div className="space-y-3 flex flex-col items-center">
-                    <div className="relative max-w-[120px] max-h-[120px] overflow-hidden rounded-xl border border-slate-200 shadow-inner">
-                      <img src={proof} alt="Proof of payment" className="object-cover w-full h-full" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">
-                        {proofFileName || 'Receipt.png'}
-                      </p>
+                Proceed to Payment (₦{getDynamicPlanFee(selectedPlan).toLocaleString()})
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Payment details step header */}
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Selected Plan</span>
+                  <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{getPlanName(selectedPlan)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKycStep('select_plan')}
+                  className="text-[10px] font-bold text-orange-500 hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  Change Plan
+                </button>
+              </div>
+
+              {/* Promo Card Summary */}
+              <div className="p-4 bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-850 rounded-2xl flex justify-between items-center">
+                <span className="text-[11px] font-bold text-zinc-400">KYC Activation Fee:</span>
+                <span className="text-sm font-black text-emerald-500">
+                  ₦{getDynamicPlanFee(selectedPlan).toLocaleString()}
+                </span>
+              </div>
+
+              {/* OPay Strict Prohibition Warning Card */}
+              <div className="p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-900/30 rounded-3xl flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h5 className="text-[11px] font-extrabold text-red-700 dark:text-red-400 uppercase tracking-wider">⚠️ DO NOT PAY VIA OPAY</h5>
+                  <p className="text-[10px] text-red-600 dark:text-red-450 leading-relaxed font-semibold">
+                    Transfer from <strong className="font-black text-red-700 dark:text-red-400">OPay accounts is strictly NOT ALLOWED</strong> and will fail compliance routing. Please use other banks like <strong className="font-black text-red-700 dark:text-red-450">Kuda, PalmPay, GTBank, Zenith, Access Bank, Moniepoint</strong>, etc., which are fully automated and verified instantly.
+                  </p>
+                </div>
+              </div>
+
+              {/* Account Details Box */}
+              <div className="p-5 bg-slate-50 dark:bg-zinc-950 rounded-3xl border border-slate-100 dark:border-zinc-850 space-y-4 shadow-inner">
+                <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Company Payment Details</h4>
+                
+                <div className="space-y-3.5">
+                  <div>
+                    <span className="text-[10px] text-zinc-400 block">Bank Name</span>
+                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{accountDetails.bankName}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-zinc-400 block">Account Number</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm font-mono font-black text-zinc-900 dark:text-white tracking-widest">{accountDetails.accountNumber}</span>
                       <button
-                        type="button"
-                        onClick={() => {
-                          setProof(null);
-                          setProofFileName('');
-                        }}
-                        className="text-[10px] font-bold text-red-500 hover:underline mt-1 bg-transparent border-none cursor-pointer"
+                        onClick={handleCopy}
+                        className="p-2 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-850 rounded-xl border border-slate-200/50 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        Change Image
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span className="text-[10px] font-bold">{copied ? 'Copied' : 'Copy'}</span>
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-950/20 text-orange-500 flex items-center justify-center mx-auto shadow-inner">
-                      <Upload className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                        Drag and drop receipt image, or <span className="text-orange-500 hover:underline cursor-pointer">browse</span>
-                      </p>
-                      <p className="text-[10px] text-zinc-400 mt-1">Supports PNG, JPG, JPEG, WEBP (Max 3MB)</p>
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="kyc-file-upload"
-                    />
-                    <label
-                      htmlFor="kyc-file-upload"
-                      className="inline-block px-4 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 cursor-pointer shadow-sm transition-all"
-                    >
-                      Choose File
-                    </label>
+
+                  <div>
+                    <span className="text-[10px] text-zinc-400 block">Account Name</span>
+                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase">{accountDetails.accountName}</span>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex items-start gap-2.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-normal">
+                      <strong>Important:</strong> Ensure you include your username <code className="bg-amber-100 dark:bg-amber-900/35 px-1 py-0.5 rounded font-bold">"{user.username}"</code> as narration or transfer reference for swift automated verification.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form and Proof Upload */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Upload Payment Proof</label>
+                  
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-3xl p-6 text-center transition-all ${
+                      dragActive 
+                        ? 'border-orange-500 bg-orange-500/5' 
+                        : proof 
+                          ? 'border-emerald-500/50 bg-emerald-500/5' 
+                          : 'border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950'
+                    }`}
+                  >
+                    {proof ? (
+                      <div className="space-y-3 flex flex-col items-center">
+                        <div className="relative max-w-[120px] max-h-[120px] overflow-hidden rounded-xl border border-slate-200 shadow-inner">
+                          <img src={proof} alt="Proof of payment" className="object-cover w-full h-full" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">
+                            {proofFileName || 'Receipt.png'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProof(null);
+                              setProofFileName('');
+                            }}
+                            className="text-[10px] font-bold text-red-500 hover:underline mt-1 bg-transparent border-none cursor-pointer"
+                          >
+                            Change Image
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-950/20 text-orange-500 flex items-center justify-center mx-auto shadow-inner">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                            Drag and drop receipt image, or <span className="text-orange-500 hover:underline cursor-pointer">browse</span>
+                          </p>
+                          <p className="text-[10px] text-zinc-400 mt-1">Supports PNG, JPG, JPEG, WEBP (Max 3MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                          id="kyc-file-upload"
+                        />
+                        <label
+                          htmlFor="kyc-file-upload"
+                          className="inline-block px-4 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 cursor-pointer shadow-sm transition-all"
+                        >
+                          Choose File
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {submittingError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
+                    {submittingError}
                   </div>
                 )}
-              </div>
-            </div>
 
-            {submittingError && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-950/50">
-                {submittingError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting || !proof}
-              className={`w-full py-3.5 font-bold rounded-2xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
-                proof 
-                  ? 'bg-zinc-900 hover:bg-zinc-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white' 
-                  : 'bg-slate-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Submitting KYC Proof...
-                </>
-              ) : (
-                'Submit Proof for Verification'
-              )}
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !proof}
+                  className={`w-full py-3.5 font-bold rounded-2xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                    proof 
+                      ? 'bg-zinc-900 hover:bg-zinc-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white' 
+                      : 'bg-slate-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Submitting KYC Proof...
+                    </>
+                  ) : (
+                    'Submit Proof for Verification'
+                  )}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       )}
     </div>
