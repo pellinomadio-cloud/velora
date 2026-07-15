@@ -117,7 +117,15 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   // Install Volera States
   const [showInstallFloat, setShowInstallFloat] = useState(true);
   const [showInstallModal, setShowInstallModal] = useState(false);
-  const [installDeviceTab, setInstallDeviceTab] = useState<'android' | 'ios'>('android');
+  const [installDeviceTab, setInstallDeviceTab] = useState<'android' | 'ios'>(() => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.userAgent) {
+      const ua = window.navigator.userAgent.toLowerCase();
+      if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) {
+        return 'ios';
+      }
+    }
+    return 'android';
+  });
   const [installStatus, setInstallStatus] = useState<'idle' | 'installing' | 'completed'>('idle');
   const [installProgress, setInstallProgress] = useState(0);
   const [installStepText, setInstallStepText] = useState('Initiating registration handshakes...');
@@ -208,22 +216,8 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
             addTransaction(tx);
           };
 
-          // If native installer prompt is captured, trigger it immediately at 100%
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult: { outcome: string }) => {
-              console.log(`User native installation choice outcome: ${choiceResult.outcome}`);
-              completeSetup();
-              setDeferredPrompt(null);
-            }).catch((err: any) => {
-              console.warn('Native installer error, falling back to instant setup:', err);
-              completeSetup();
-            });
-          } else {
-            // Otherwise, complete the simulated setup gracefully
-            completeSetup();
-          }
-
+          // Complete the simulated setup gracefully
+          completeSetup();
           return 100;
         }
 
@@ -246,8 +240,47 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   };
 
   const handleNativeOrSimulatedInstall = async () => {
-    // Always trigger the elegant 5-second immersive loading sequence first!
-    handleSimulatedInstall();
+    if (deferredPrompt) {
+      // Synchronous user gesture: Show native browser install/download dialog immediately
+      try {
+        const promptEvent = deferredPrompt;
+        promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
+        console.log(`User native installation choice outcome: ${choiceResult.outcome}`);
+        
+        if (choiceResult.outcome === 'accepted') {
+          // Instantly complete and record the native installation
+          setInstallStatus('completed');
+          setIsPwaInstalled(true);
+          localStorage.setItem('velora_pwa_installed', 'true');
+
+          // Award the registration/installation reward of ₦1,000!
+          const rewardAmount = 1000;
+          const updatedUser = { ...user, balance: user.balance + rewardAmount };
+          updateGlobalUser(updatedUser);
+
+          const tx: Transaction = {
+            id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
+            type: 'deposit',
+            title: 'App Installation Reward',
+            subtitle: 'Bonus for setting up Volera on device',
+            amount: rewardAmount,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            status: 'completed',
+            reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
+          };
+          addTransaction(tx);
+        }
+      } catch (err) {
+        console.warn('Native prompt failed, falling back to simulated onboarding:', err);
+        handleSimulatedInstall();
+      } finally {
+        setDeferredPrompt(null);
+      }
+    } else {
+      // Fallback for devices without native 'beforeinstallprompt' support (e.g. iOS Safari)
+      handleSimulatedInstall();
+    }
   };
   
   // Transaction / Modal states
