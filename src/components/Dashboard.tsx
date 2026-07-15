@@ -126,9 +126,6 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }
     return 'android';
   });
-  const [installStatus, setInstallStatus] = useState<'idle' | 'installing' | 'completed'>('idle');
-  const [installProgress, setInstallProgress] = useState(0);
-  const [installStepText, setInstallStepText] = useState('Initiating registration handshakes...');
   const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
     if (typeof window !== 'undefined') {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
@@ -151,7 +148,6 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
       setIsPwaInstalled(true);
       setShowInstallFloat(false);
       localStorage.setItem('velora_pwa_installed', 'true');
-      setInstallStatus('completed');
     };
 
     // Check on mount if we are running as standalone PWA
@@ -181,65 +177,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     }
   }, []);
 
-  const handleSimulatedInstall = () => {
-    if (installStatus !== 'idle') return;
-    setInstallStatus('installing');
-    setInstallProgress(0);
-    setInstallStepText('Initiating secure handshakes...');
-
-    const interval = setInterval(() => {
-      setInstallProgress((prev) => {
-        const next = prev + 1;
-        if (next >= 100) {
-          clearInterval(interval);
-          
-          const completeSetup = () => {
-            setInstallStatus('completed');
-            setIsPwaInstalled(true);
-            localStorage.setItem('velora_pwa_installed', 'true');
-
-            // Add a beautiful registration/installation reward of ₦1,000!
-            const rewardAmount = 1000;
-            const updatedUser = { ...user, balance: user.balance + rewardAmount };
-            updateGlobalUser(updatedUser);
-
-            const tx: Transaction = {
-              id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
-              type: 'deposit',
-              title: 'App Installation Reward',
-              subtitle: 'Bonus for setting up Volera on device',
-              amount: rewardAmount,
-              date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-              status: 'completed',
-              reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
-            };
-            addTransaction(tx);
-          };
-
-          // Complete the simulated setup gracefully
-          completeSetup();
-          return 100;
-        }
-
-        // Dynamic step texts for 5-second loader duration
-        if (next < 20) {
-          setInstallStepText('Handshaking with central ledger...');
-        } else if (next < 40) {
-          setInstallStepText('Provisioning secure sandboxed vault...');
-        } else if (next < 60) {
-          setInstallStepText('Caching offline asset pricing...');
-        } else if (next < 80) {
-          setInstallStepText('Linking native biometric interfaces...');
-        } else {
-          setInstallStepText('Deploying shortcut daemon & launcher...');
-        }
-
-        return next;
-      });
-    }, 50); // 100 steps * 50ms = 5000ms (exactly 5 seconds)
-  };
-
-  const handleNativeOrSimulatedInstall = async () => {
+  const handleNativeInstall = async () => {
     if (deferredPrompt) {
       // Synchronous user gesture: Show native browser install/download dialog immediately
       try {
@@ -250,36 +188,16 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
         
         if (choiceResult.outcome === 'accepted') {
           // Instantly complete and record the native installation
-          setInstallStatus('completed');
           setIsPwaInstalled(true);
           localStorage.setItem('velora_pwa_installed', 'true');
-
-          // Award the registration/installation reward of ₦1,000!
-          const rewardAmount = 1000;
-          const updatedUser = { ...user, balance: user.balance + rewardAmount };
-          updateGlobalUser(updatedUser);
-
-          const tx: Transaction = {
-            id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
-            type: 'deposit',
-            title: 'App Installation Reward',
-            subtitle: 'Bonus for setting up Volera on device',
-            amount: rewardAmount,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            status: 'completed',
-            reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
-          };
-          addTransaction(tx);
+          setShowInstallFloat(false);
+          setShowInstallModal(false);
         }
       } catch (err) {
-        console.warn('Native prompt failed, falling back to simulated onboarding:', err);
-        handleSimulatedInstall();
+        console.warn('Native prompt failed:', err);
       } finally {
         setDeferredPrompt(null);
       }
-    } else {
-      // Fallback for devices without native 'beforeinstallprompt' support (e.g. iOS Safari)
-      handleSimulatedInstall();
     }
   };
   
@@ -2446,78 +2364,23 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
                 {/* Automated installation engine panel */}
                 <div className="space-y-3.5 text-center">
-                  {installStatus === 'idle' ? (
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleNativeOrSimulatedInstall}
-                        className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>{deferredPrompt ? 'INSTALL VOLERA APP' : 'INSTALL VOLERA NOW'}</span>
-                      </button>
-                      
-                      {isNewUserRegistered && (
-                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                          <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 text-left uppercase tracking-wide">
-                            Install bonus active: Complete installation to earn +₦1,000 immediately!
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : installStatus === 'installing' ? (
-                    <div className="p-5 bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-850 rounded-3xl space-y-4">
-                      {/* Progress bar */}
-                      <div className="flex justify-between items-center text-[10px] font-black text-zinc-500 tracking-wider">
-                        <span className="uppercase text-orange-500 animate-pulse">{installStepText}</span>
-                        <span>{installProgress}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
-                        <div
-                          className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-150 ease-out"
-                          style={{ width: `${installProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                        Do not close the web application...
+                  {deferredPrompt ? (
+                    <button
+                      onClick={handleNativeInstall}
+                      className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>DOWNLOAD & INSTALL VOLERA</span>
+                    </button>
+                  ) : (
+                    <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-left space-y-2">
+                      <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wide flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" /> Direct App Installation
+                      </p>
+                      <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-semibold leading-relaxed">
+                        Volera is a modern Progressive Web App (PWA). When you install it, Google Chrome builds and downloads a <strong>real app</strong> (WebAPK) directly onto your Android device. It will appear inside your phone's app drawer, has full standalone memory, and launches full-screen without web browser bars — exactly like OPay or other native apps!
                       </p>
                     </div>
-                  ) : (
-                    <motion.div
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="p-5 bg-emerald-50 dark:bg-emerald-950/15 border border-emerald-100 dark:border-emerald-950/30 rounded-3xl text-center space-y-3.5"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-500 flex items-center justify-center mx-auto shadow-inner">
-                        <Check className="w-6 h-6 stroke-[3]" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">
-                          Volera Installed!
-                        </p>
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold max-w-xs mx-auto leading-relaxed">
-                          The native container is configured. Launcher added to Home screen with TLS 1.3 encryption keys.
-                        </p>
-                      </div>
-
-                      <div className="p-3 bg-white dark:bg-zinc-900 border border-emerald-100/50 dark:border-emerald-900/10 rounded-2xl flex items-center justify-between text-left">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center text-white font-black text-xs">V</div>
-                          <div>
-                            <p className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Installation Bonus</p>
-                            <p className="text-[8px] text-zinc-400 font-bold">Credited successfully</p>
-                          </div>
-                        </div>
-                        <p className="text-xs font-black text-emerald-500">+₦1,000.00</p>
-                      </div>
-
-                      <button
-                        onClick={() => setShowInstallModal(false)}
-                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
-                      >
-                        Launch Dashboard
-                      </button>
-                    </motion.div>
                   )}
                 </div>
 
