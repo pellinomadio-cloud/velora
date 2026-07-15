@@ -3,8 +3,9 @@ const CACHE_NAME = 'volera-cache-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/src/main.tsx',
-  '/manifest.json'
+  '/manifest.json',
+  '/assets/icon-192.png',
+  '/assets/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

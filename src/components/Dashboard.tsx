@@ -2393,6 +2393,20 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
                 {/* Steps and Guide Container */}
                 <div className="p-4 bg-slate-50 dark:bg-zinc-950 rounded-3xl border border-slate-100/60 dark:border-zinc-850/50 text-left space-y-3.5">
+                  {typeof window !== 'undefined' && window.self !== window.top && (
+                    <div className="p-3 mb-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                      <div className="text-left space-y-1">
+                        <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                          Active Preview Editor Detected
+                        </p>
+                        <p className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 leading-normal">
+                          Browsers prevent app installations inside preview frames. Please click the <strong className="font-extrabold text-orange-500 hover:underline">external open tab button</strong> in top right to run Volera in your main browser, then click Install!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">
                     Manual Steps:
                   </p>
@@ -2439,7 +2453,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                         className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
                       >
                         <Download className="w-4 h-4" />
-                        <span>{deferredPrompt ? 'INSTALL NATIVELY' : 'INSTALL NOW'}</span>
+                        <span>{deferredPrompt ? 'INSTALL VOLERA APP' : 'INSTALL VOLERA NOW'}</span>
                       </button>
                       
                       {isNewUserRegistered && (
