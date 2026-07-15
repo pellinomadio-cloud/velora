@@ -171,8 +171,6 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
     const justRegistered = localStorage.getItem('velora_just_registered');
     if (justRegistered === 'true') {
       setIsNewUserRegistered(true);
-      // Automatically open the install modal for a new registered user!
-      setShowInstallModal(true);
       localStorage.removeItem('velora_just_registered'); // clear to avoid repeating
     }
   }, []);
@@ -1136,6 +1134,51 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                         <Briefcase className="w-4 h-4 text-orange-400" />
                       </div>
                       <span className="text-[10px] font-bold text-zinc-300 tracking-wide">Volerapay Earn</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1.5. NEW DIRECT MOBILE APP DOWNLOAD TOGGLE (No Install Bonus/Rewards) */}
+                <div className="p-4.5 rounded-[28px] bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 shadow-sm flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {/* Premium Green and Gold Naira Logo preview */}
+                      <div className="w-10 h-10 rounded-xl bg-[#047857] border border-[#F59E0B]/30 flex items-center justify-center shrink-0 shadow-inner">
+                        <span className="text-[#F59E0B] font-black text-lg">₦</span>
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-[11px] font-black text-zinc-800 dark:text-white uppercase tracking-wider">
+                          Direct App Installation
+                        </h3>
+                        <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-semibold mt-0.5 leading-relaxed">
+                          Download Volera directly to your phone's app drawer for full standalone performance.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Green & Gold Toggle Switch */}
+                    <button
+                      onClick={() => {
+                        setShowInstallModal(true);
+                      }}
+                      className="flex items-center cursor-pointer shrink-0"
+                    >
+                      <div className={`w-11 h-6 rounded-full p-0.5 transition-all duration-300 ${isPwaInstalled ? 'bg-[#047857]' : 'bg-zinc-300 dark:bg-zinc-850'}`}>
+                        <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all duration-300 ${isPwaInstalled ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Tiny instruction footer */}
+                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-50 dark:border-zinc-850/50">
+                    <span className="text-[9px] text-zinc-500 font-bold flex items-center gap-1">
+                      <Smartphone className="w-3.5 h-3.5 text-[#047857]" /> Standalone WebAPK Support
+                    </span>
+                    <button
+                      onClick={() => setShowInstallModal(true)}
+                      className="text-[9px] font-black text-orange-500 hover:underline uppercase tracking-wider"
+                    >
+                      Install Guide &rarr;
                     </button>
                   </div>
                 </div>
@@ -2179,33 +2222,6 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
           )}
         </AnimatePresence>
 
-        {/* Floating Install App Toggle Tab */}
-        {showInstallFloat && !isPwaInstalled && (
-          <div className="fixed right-0 top-[35%] z-[100] flex flex-col items-end pointer-events-none select-none">
-            <div className="pointer-events-auto flex items-center relative group">
-              {/* Pulsing indicator if not installed */}
-              {!isPwaInstalled && (
-                <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
-                </span>
-              )}
-
-              {/* Collapsible/Expandable Pull Tab */}
-              <button
-                onClick={() => setShowInstallModal(true)}
-                className="flex items-center gap-2.5 bg-gradient-to-l from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white pl-4 pr-3.5 py-3 rounded-l-3xl shadow-2xl border-y border-l border-white/10 transition-all duration-300 cursor-pointer group-hover:pl-5 group-hover:translate-x-[-2px] active:scale-95"
-              >
-                <Smartphone className={`w-4 h-4 ${!isPwaInstalled ? 'animate-bounce' : ''}`} />
-                <span className="text-[10px] font-black tracking-widest uppercase max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-500 ease-in-out whitespace-nowrap">
-                  {isPwaInstalled ? 'Installed' : 'Install Volera'}
-                </span>
-                <span className={`w-2 h-2 rounded-full ${isPwaInstalled ? 'bg-emerald-400' : 'bg-orange-300 animate-pulse'}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Immersive Installation Modal */}
         <AnimatePresence>
           {showInstallModal && (
@@ -2217,7 +2233,6 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 transition={{ type: 'spring', damping: 25, stiffness: 350 }}
                 className="w-full max-w-md bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-850 rounded-[32px] overflow-hidden shadow-2xl relative p-6 space-y-6 select-none"
               >
-                {/* Close Button */}
                 <button
                   onClick={() => setShowInstallModal(false)}
                   className="absolute right-5 top-5 p-2 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-all cursor-pointer"
@@ -2227,45 +2242,33 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
 
                 {/* Brand Logo & Presentation */}
                 <div className="text-center space-y-3 pt-2">
-                  <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-gradient-to-tr from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/5">
-                    {/* Beautiful Geometric Volera App Logo */}
-                    <svg className="w-20 h-20 drop-shadow-[0_0_25px_rgba(249,115,22,0.35)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="50" cy="50" r="46" stroke="url(#logoGradModal)" strokeWidth="1.5" strokeLinecap="round" className="animate-[spin_20s_linear_infinite_reverse]" strokeDasharray="6 8" />
-                      <circle cx="50" cy="50" r="41" stroke="url(#logoGradModal)" strokeWidth="4.5" strokeLinecap="round" className="animate-[spin_12s_linear_infinite]" strokeDasharray="160 50" />
+                  <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-gradient-to-tr from-[#047857]/10 to-[#F59E0B]/10 dark:from-[#047857]/25 dark:to-[#F59E0B]/5">
+                    {/* Beautiful Geometric Volera App Logo - Green & Gold Naira design */}
+                    <svg className="w-20 h-20 drop-shadow-[0_0_25px_rgba(4,120,87,0.35)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="50" cy="50" r="46" stroke="url(#goldGradModal)" strokeWidth="1.5" strokeLinecap="round" className="animate-[spin_20s_linear_infinite_reverse]" strokeDasharray="6 8" />
+                      <circle cx="50" cy="50" r="41" stroke="url(#goldGradModal)" strokeWidth="4.5" strokeLinecap="round" className="animate-[spin_12s_linear_infinite]" strokeDasharray="160 50" />
                       <circle cx="50" cy="50" r="34" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
                       
-                      <polygon points="50,22 75,36 75,64 50,78 25,64 25,36" fill="url(#hexBackdropModal)" stroke="url(#hexBorderModal)" strokeWidth="1.5" />
+                      <polygon points="50,22 75,36 75,64 50,78 25,64 25,36" fill="url(#greenBackdropModal)" stroke="url(#goldBorderModal)" strokeWidth="1.5" />
                       
-                      <path d="M33,35 L50,68 L42,73 L23,40 Z" fill="url(#vLeftGradModal)" />
-                      <path d="M67,35 L50,68 L58,73 L77,40 Z" fill="url(#vRightGradModal)" />
+                      {/* Bold Stylized Naira Currency Sign */}
+                      <text x="50" y="59" textAnchor="middle" fill="url(#goldGradModal)" fontSize="28" fontWeight="900" fontFamily="sans-serif">₦</text>
                       
-                      <path d="M50,68 L42,73 L47,52 Z" fill="rgba(255,255,255,0.22)" />
-                      <path d="M50,68 L58,73 L53,52 Z" fill="rgba(255,255,255,0.12)" />
+                      <circle cx="50" cy="42" r="2.5" fill="#FFFFFF" className="animate-pulse opacity-40" />
                       
-                      <circle cx="50" cy="42" r="3" fill="#FFFFFF" className="animate-pulse" />
-                      <circle cx="50" cy="42" r="7.5" stroke="url(#logoGradModal)" strokeWidth="1" className="animate-ping opacity-60" />
-
                       <defs>
-                        <linearGradient id="logoGradModal" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="#F97316" />
-                          <stop offset="50%" stopColor="#F59E0B" />
-                          <stop offset="100%" stopColor="#EA580C" />
-                        </linearGradient>
-                        <linearGradient id="hexBackdropModal" x1="50" y1="22" x2="50" y2="78" gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="#1E1F22" />
-                          <stop offset="100%" stopColor="#090A0C" />
-                        </linearGradient>
-                        <linearGradient id="hexBorderModal" x1="25" y1="36" x2="75" y2="64" gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
-                          <stop offset="100%" stopColor="#EA580C" stopOpacity="0.1" />
-                        </linearGradient>
-                        <linearGradient id="vLeftGradModal" x1="23" y1="40" x2="50" y2="68" gradientUnits="userSpaceOnUse">
+                        <linearGradient id="goldGradModal" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
                           <stop offset="0%" stopColor="#F59E0B" />
-                          <stop offset="100%" stopColor="#D97706" />
+                          <stop offset="50%" stopColor="#D97706" />
+                          <stop offset="100%" stopColor="#92400E" />
                         </linearGradient>
-                        <linearGradient id="vRightGradModal" x1="50" y1="68" x2="77" y2="40" gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="#F97316" />
-                          <stop offset="100%" stopColor="#EA580C" />
+                        <linearGradient id="greenBackdropModal" x1="50" y1="22" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#065F46" />
+                          <stop offset="100%" stopColor="#022C22" />
+                        </linearGradient>
+                        <linearGradient id="goldBorderModal" x1="25" y1="36" x2="75" y2="64" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.8" />
+                          <stop offset="100%" stopColor="#D97706" stopOpacity="0.3" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -2287,7 +2290,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                     onClick={() => setInstallDeviceTab('android')}
                     className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       installDeviceTab === 'android'
-                        ? 'bg-white dark:bg-zinc-850 text-orange-500 dark:text-orange-400 shadow-sm'
+                        ? 'bg-white dark:bg-zinc-850 text-emerald-600 dark:text-emerald-400 shadow-sm'
                         : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
                     }`}
                   >
@@ -2298,7 +2301,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                     onClick={() => setInstallDeviceTab('ios')}
                     className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       installDeviceTab === 'ios'
-                        ? 'bg-white dark:bg-zinc-850 text-orange-500 dark:text-orange-400 shadow-sm'
+                        ? 'bg-white dark:bg-zinc-850 text-emerald-600 dark:text-emerald-400 shadow-sm'
                         : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
                     }`}
                   >
@@ -2312,14 +2315,14 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                 {/* Steps and Guide Container */}
                 <div className="p-4 bg-slate-50 dark:bg-zinc-950 rounded-3xl border border-slate-100/60 dark:border-zinc-850/50 text-left space-y-3.5">
                   {typeof window !== 'undefined' && window.self !== window.top && (
-                    <div className="p-3 mb-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5">
-                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="p-3 mb-2 bg-emerald-500/10 border border-[#047857]/20 rounded-2xl flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5 animate-pulse" />
                       <div className="text-left space-y-1">
-                        <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                           Active Preview Editor Detected
                         </p>
                         <p className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 leading-normal">
-                          Browsers prevent app installations inside preview frames. Please click the <strong className="font-extrabold text-orange-500 hover:underline">external open tab button</strong> in top right to run Volera in your main browser, then click Install!
+                          Browsers prevent app installations inside preview frames. Please click the <strong className="font-extrabold text-emerald-600">external open tab button</strong> in top right to run Volera in your main browser, then click Install!
                         </p>
                       </div>
                     </div>
@@ -2332,30 +2335,30 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   {installDeviceTab === 'android' ? (
                     <div className="space-y-3 text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-semibold">
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
                         <span>Open Chrome options by tapping the Menu icon (<strong className="font-extrabold text-zinc-900 dark:text-white">⋮</strong>) in the top-right toolbar.</span>
                       </div>
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
                         <span>Find and select <strong className="font-extrabold text-zinc-900 dark:text-white">"Add to Home screen"</strong> or <strong className="font-extrabold text-zinc-900 dark:text-white">"Install app"</strong>.</span>
                       </div>
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
                         <span>Confirm prompt to place Volera securely on your home screen launcher.</span>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-3 text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-semibold">
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">1</span>
                         <span>Tap Safari's <strong className="font-extrabold text-zinc-900 dark:text-white">Share</strong> button (<strong className="font-extrabold text-zinc-900 dark:text-white">⎋</strong>) on the bottom navigation bar.</span>
                       </div>
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">2</span>
                         <span>Scroll through options and click <strong className="font-extrabold text-zinc-900 dark:text-white">"Add to Home Screen"</strong> (<strong className="font-extrabold text-zinc-900 dark:text-white">+</strong>).</span>
                       </div>
                       <div className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
+                        <span className="w-5 h-5 rounded-full bg-[#047857]/10 text-[#047857] flex items-center justify-center text-[10px] shrink-0 font-black">3</span>
                         <span>Tap <strong className="font-extrabold text-zinc-900 dark:text-white">Add</strong> in the top-right corner to save launcher icon.</span>
                       </div>
                     </div>
@@ -2367,15 +2370,15 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
                   {deferredPrompt ? (
                     <button
                       onClick={handleNativeInstall}
-                      className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-orange-500/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
+                      className="w-full py-4 bg-[#047857] hover:bg-[#035e43] border border-[#F59E0B]/30 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:shadow-emerald-600/15 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
                     >
                       <Download className="w-4 h-4" />
                       <span>DOWNLOAD & INSTALL VOLERA</span>
                     </button>
                   ) : (
-                    <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-left space-y-2">
-                      <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wide flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" /> Direct App Installation
+                    <div className="p-4 bg-emerald-500/10 border border-[#047857]/20 rounded-2xl text-left space-y-2">
+                      <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" /> Direct App Installation
                       </p>
                       <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-semibold leading-relaxed">
                         Volera is a modern Progressive Web App (PWA). When you install it, Google Chrome builds and downloads a <strong>real app</strong> (WebAPK) directly onto your Android device. It will appear inside your phone's app drawer, has full standalone memory, and launches full-screen without web browser bars — exactly like OPay or other native apps!
