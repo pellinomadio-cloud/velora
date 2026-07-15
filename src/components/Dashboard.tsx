@@ -122,19 +122,44 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   const [installProgress, setInstallProgress] = useState(0);
   const [installStepText, setInstallStepText] = useState('Initiating registration handshakes...');
   const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      if (isStandalone) return true;
+    }
     return localStorage.getItem('velora_pwa_installed') === 'true';
   });
   const [isNewUserRegistered, setIsNewUserRegistered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Monitor browser PWA prompt capability
+  // Monitor browser PWA prompt capability and standalone/installation events
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
+
+    const handleAppInstalled = () => {
+      console.log('Volera was installed natively');
+      setIsPwaInstalled(true);
+      setShowInstallFloat(false);
+      localStorage.setItem('velora_pwa_installed', 'true');
+      setInstallStatus('completed');
+    };
+
+    // Check on mount if we are running as standalone PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (isStandalone) {
+      setIsPwaInstalled(true);
+      setShowInstallFloat(false);
+    }
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
   // Check for newly registered user on mount
@@ -159,26 +184,45 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
         const next = prev + 1;
         if (next >= 100) {
           clearInterval(interval);
-          setInstallStatus('completed');
-          setIsPwaInstalled(true);
-          localStorage.setItem('velora_pwa_installed', 'true');
+          
+          const completeSetup = () => {
+            setInstallStatus('completed');
+            setIsPwaInstalled(true);
+            localStorage.setItem('velora_pwa_installed', 'true');
 
-          // Add a beautiful registration/installation reward of ₦1,000!
-          const rewardAmount = 1000;
-          const updatedUser = { ...user, balance: user.balance + rewardAmount };
-          updateGlobalUser(updatedUser);
+            // Add a beautiful registration/installation reward of ₦1,000!
+            const rewardAmount = 1000;
+            const updatedUser = { ...user, balance: user.balance + rewardAmount };
+            updateGlobalUser(updatedUser);
 
-          const tx: Transaction = {
-            id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
-            type: 'deposit',
-            title: 'App Installation Reward',
-            subtitle: 'Bonus for setting up Volera on device',
-            amount: rewardAmount,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            status: 'completed',
-            reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
+            const tx: Transaction = {
+              id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
+              type: 'deposit',
+              title: 'App Installation Reward',
+              subtitle: 'Bonus for setting up Volera on device',
+              amount: rewardAmount,
+              date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              status: 'completed',
+              reference: `PWA-${Math.floor(100000 + Math.random() * 900000)}`
+            };
+            addTransaction(tx);
           };
-          addTransaction(tx);
+
+          // If native installer prompt is captured, trigger it immediately at 100%
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult: { outcome: string }) => {
+              console.log(`User native installation choice outcome: ${choiceResult.outcome}`);
+              completeSetup();
+              setDeferredPrompt(null);
+            }).catch((err: any) => {
+              console.warn('Native installer error, falling back to instant setup:', err);
+              completeSetup();
+            });
+          } else {
+            // Otherwise, complete the simulated setup gracefully
+            completeSetup();
+          }
 
           return 100;
         }
@@ -202,35 +246,8 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
   };
 
   const handleNativeOrSimulatedInstall = async () => {
-    if (deferredPrompt) {
-      // Trigger native browser install dialog directly!
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User installation choice outcome: ${outcome}`);
-      if (outcome === 'accepted') {
-        setIsPwaInstalled(true);
-        localStorage.setItem('velora_pwa_installed', 'true');
-        setInstallStatus('completed');
-        // Give installation bonus
-        const rewardAmount = 1000;
-        updateGlobalUser({ ...user, balance: user.balance + rewardAmount });
-        const tx: Transaction = {
-          id: `TX-INST-${Math.floor(100000 + Math.random() * 900000)}`,
-          type: 'deposit',
-          title: 'Native App Installation Reward',
-          subtitle: 'Bonus for native setup',
-          amount: rewardAmount,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-          status: 'completed',
-          reference: `PWA-NAT-${Math.floor(100000 + Math.random() * 900000)}`
-        };
-        addTransaction(tx);
-      }
-      setDeferredPrompt(null);
-    } else {
-      // Run the beautiful, highly realistic 5-second simulated fallback
-      handleSimulatedInstall();
-    }
+    // Always trigger the elegant 5-second immersive loading sequence first!
+    handleSimulatedInstall();
   };
   
   // Transaction / Modal states
@@ -2212,7 +2229,7 @@ export default function Dashboard({ user: initialUser, onLogout, darkMode, onTog
         </AnimatePresence>
 
         {/* Floating Install App Toggle Tab */}
-        {showInstallFloat && (
+        {showInstallFloat && !isPwaInstalled && (
           <div className="fixed right-0 top-[35%] z-[100] flex flex-col items-end pointer-events-none select-none">
             <div className="pointer-events-auto flex items-center relative group">
               {/* Pulsing indicator if not installed */}

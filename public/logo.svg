@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#121318" />
+      <stop offset="100%" stop-color="#050608" />
+    </radialGradient>
+    
+    <!-- Outer Ring Gradient -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    
+    <!-- Left Wing Gradient -->
+    <linearGradient id="leftWing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <!-- Right Wing Gradient -->
+    <linearGradient id="rightWing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+
+    <!-- Metallic/Hex Border Gradient -->
+    <linearGradient id="hexBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#EA580C" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Solid rounded background for Android Adaptive/Maskable Icons -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
+
+  <g transform="translate(0, 0)">
+    <!-- Outer orbiting dots -->
+    <circle cx="256" cy="256" r="230" stroke="url(#ringGrad)" stroke-width="6" stroke-dasharray="30 40" fill="none" opacity="0.3" />
+    
+    <!-- Main outer ring -->
+    <circle cx="256" cy="256" r="210" stroke="url(#ringGrad)" stroke-width="14" stroke-dasharray="800 200" fill="none" />
+    
+    <!-- Inner subtle ring -->
+    <circle cx="256" cy="256" r="175" stroke="#FFFFFF" stroke-width="3" opacity="0.1" fill="none" />
+    
+    <!-- Hexagonal Shield Backdrop -->
+    <polygon points="256,110 386,185 386,335 256,410 126,335 126,185" fill="#121318" stroke="url(#hexBorder)" stroke-width="6" />
+
+    <!-- 3D V-Wings -->
+    <!-- Left wing -->
+    <path d="M170,180 L256,350 L215,375 L120,205 Z" fill="url(#leftWing)" />
+    <!-- Right wing -->
+    <path d="M342,180 L256,350 L297,375 L392,205 Z" fill="url(#rightWing)" />
+
+    <!-- Overlapping gloss shading -->
+    <path d="M256,350 L215,375 L240,265 Z" fill="#FFFFFF" opacity="0.15" />
+    <path d="M256,350 L297,375 L272,265 Z" fill="#FFFFFF" opacity="0.08" />
+
+    <!-- Center active element -->
+    <circle cx="256" cy="210" r="15" fill="#FFFFFF" />
+    <circle cx="256" cy="210" r="35" stroke="url(#ringGrad)" stroke-width="4" opacity="0.6" />
+  </g>
+</svg>
